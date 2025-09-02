@@ -1,0 +1,2581 @@
+        function renderPasswords() {
+            const passwordRows = document.getElementById('passwordRows');
+            if (!passwordRows) return;
+            
+            passwordRows.innerHTML = '';
+            
+            // Use filtered passwords if search is active
+            const searchTerm = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+            const passwordsToShow = searchTerm !== '' ? filteredPasswords : passwords;
+            
+            passwordsToShow.forEach(pwd => {
+                const row = document.createElement('div');
+                row.className = 'table-row bounce-in';
+                row.innerHTML = `
+                    <div class="cell entity">
+                        <span id="entity-${pwd.id}">${pwd.entity}</span>
+                        <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell">
+                        <span id="username-${pwd.id}">${pwd.username}</span>
+                        <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell password">
+                        <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                        <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                        <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                    </div>
+                    <div class="cell actions">
+                        <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                        <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                        <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                        <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                        <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                    </div>
+                `;
+                passwordRows.appendChild(row);
+            });
+            updateEmptyStates();
+        }
+
+        // Search functionality - Define globally to ensure accessibility
+        window.searchCredentials = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                filteredPasswords = [];
+                clearBtn.classList.remove('show');
+            } else {
+                filteredPasswords = passwords.filter(pwd => 
+                    pwd.entity.toLowerCase().includes(searchTerm) ||
+                    pwd.username.toLowerCase().includes(searchTerm)
+                );
+                clearBtn.classList.add('show');
+            }
+            
+            renderPasswords();
+            updateEmptyStates();
+        };
+
+        window.clearSearch = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            searchInput.value = '';
+            clearBtn.classList.remove('show');
+            filteredPasswords = [];
+            renderPasswords();
+            updateEmptyStates();
+        };        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .bounce-in { animation: bounceIn 0.6s ease; }
+
+        @media (max-width: 414px) {
+            .container { box-shadow: none; }
+            .photo-grid { grid-template-columns: repeat(2, 1fr); }
+            .table-header, .table-row { 
+                padding: 12px; 
+                font-size: 13px; 
+                grid-template-columns: 1fr 1fr 1fr 70px; 
+            }
+            .modal-content { margin: 10px; }
+            .current-selections { grid-template-columns: 1fr; }
+            .login-container { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <!-- Create Password Screen -->
+            <div id="createPasswordScreen">
+                <div class="login-header">
+                    <h1>🔐 SecureVault Pro</h1>
+                    <p>Create your master password to secure your vault</p>
+                </div>
+                <div class="login-form">
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="newMasterPassword" placeholder="Create Master Password (min 6 chars)" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
+                    </div>
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="confirmMasterPassword" placeholder="Confirm Master Password" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
+                    </div>
+                    <button type="button" class="login-btn" onclick="handleCreatePassword()">🔐 Create Vault</button>
+                    <div class="login-error" id="createPasswordError">Passwords don't match. Please try again.</div>
+                </div>
+            </div>
+
+            <!-- Login Screen -->
+            <div id="loginPasswordScreen" style="display: none;">
+                <div class="login-header">
+                    <h1>🔐 SecureVault Pro</h1>
+                    <p>Enter your master password to access your vault</p>
+                </div>
+                <div class="login-form">
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="masterPassword" placeholder="Master Password" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
+                    </div>
+                    <button type="button" class="login-btn" onclick="handleLogin()">🚀 Access Vault</button>
+                    <div class="login-error" id="loginError">Invalid password. Please try again.</div>
+                    <button type="button" class="reset-password-btn" onclick="resetMasterPassword()">Reset Master Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app" id="mainApp">
+        <div class="container">
+            <div class="header">
+                <button class="menu-btn" onclick="toggleDropdown()">⋮</button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <button class="dropdown-item" onclick="changePassword()">🔑 Change Password</button>
+                    <button class="dropdown-item" onclick="logout()">🚪 Logout</button>
+                </div>
+                <h1>🔐 SecureVault Pro</h1>
+                <p>Professional credential management with AI extraction</p>
+            </div>
+
+            <div class="tab-container">
+                <div class="tab active" data-tab="photos">
+                    <span class="tab-icon">📸</span>
+                    Photos
+                </div>
+                <div class="tab" data-tab="passwords">
+                    <span class="tab-icon">🔑</span>
+                    Credentials
+                </div>
+            </div>
+
+            <div class="content">
+                <!-- Photos Section -->
+                <div class="section active" id="photos">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="processing-indicator" id="processingIndicator">🔍 Processing OCR...</div>
+                        <span class="upload-icon">🔍</span>
+                        <div class="upload-text">Upload credential screenshots</div>
+                        <div class="upload-subtext">AI-powered OCR will extract all text for easy mapping</div>
+                        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+                        <div class="progress-container" id="progressContainer">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="progress-text" id="progressText">Processing...</div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Entry Button -->
+                    <div class="manual-entry-container">
+                        <button class="manual-entry-btn" onclick="openManualEntryModal()">
+                            <span class="manual-entry-icon">✍️</span>
+                            <div class="manual-entry-text">Manual Entry</div>
+                            <div class="manual-entry-subtext">Add credentials manually without photo</div>
+                        </button>
+                    </div>
+                    
+                    <div class="photo-grid" id="photoGrid"></div>
+                    
+                    <div class="empty-state" id="photoEmptyState">
+                        <span class="empty-icon">📸</span>
+                        <h3>No Images Uploaded</h3>
+                        <p>Upload screenshots containing login credentials.<br>Our AI will extract all text automatically.</p>
+                        <button class="empty-manual-btn" onclick="openManualEntryModal()">
+                            ✍️ Or add credentials manually
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Passwords Section -->
+                <div class="section" id="passwords">
+                    <div class="search-container">
+                        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search credentials by entity name..." oninput="searchCredentials()">
+                        <button class="clear-search" id="clearSearch" onclick="clearSearch()">✕</button>
+                        <span class="search-icon">🔍</span>
+                    </div>
+
+                    <div class="password-table" id="passwordTable">
+                        <div class="table-header">
+                            <div>Entity</div>
+                            <div>Username/ID</div>
+                            <div>Password</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="passwordRows"></div>
+                    </div>
+
+                    <div class="empty-state" id="passwordEmptyState">
+                        <span class="empty-icon">🔑</span>
+                        <h3>No Credentials Stored</h3>
+                        <p>Upload images and map credentials to start building<br>your secure digital vault.</p>
+                    </div>
+
+                    <div class="empty-state" id="noSearchResults" style="display: none;">
+                        <span class="empty-icon">🔍</span>
+                        <h3>No Results Found</h3>
+                        <p>No credentials match your search criteria.<br>Try a different search term.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Entry Modal -->
+    <div class="modal" id="manualEntryModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeManualEntryModal()">✕</button>
+            <div class="modal-header">
+                <h2>✍️ Manual Credential Entry</h2>
+                <p>Enter credential details manually</p>
+            </div>
+            <div class="modal-body">
+                <!-- Manual Entry Form -->
+                <div class="selection-progress">
+                    <div class="current-selections">
+                        <div class="selection-display entity">
+                            <div class="selection-label">🏢 Entity</div>
+                            <input type="text" class="manual-field-input" id="manualEntity" placeholder="Enter service/website name">
+                        </div>
+                        <div class="selection-display username">
+                            <div class="selection-label">👤 Username/ID</div>
+                            <input type="text" class="manual-field-input" id="manualUsername" placeholder="Enter username or email">
+                        </div>
+                        <div class="selection-display password">
+                            <div class="selection-label">🔑 Password</div>
+                            <div style="position: relative;">
+                                <input type="password" class="manual-field-input" id="manualPassword" placeholder="Enter password">
+                                <button type="button" class="manual-password-toggle" onclick="toggleManualPassword()">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="instruction-text">
+                    <strong>📝 Instructions:</strong> Fill in all three fields above. Entity is the service name (e.g., Gmail, Facebook), Username is your login ID or email, and Password is your secret password.
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="modal-actions">
+                    <button class="btn btn-cancel" onclick="closeManualEntryModal()">❌ Cancel</button>
+                    <button class="btn btn-save" id="manualSaveBtn" onclick="saveManualCredential()">💾 Save Credential</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div class="photo-modal" id="photoModal">
+        <button class="photo-modal-close" onclick="closePhotoModal()">✕</button>
+        <div class="photo-modal-content">
+            <img id="photoModalImage" src="" alt="Full size photo">
+        </div>
+    </div>
+
+    <!-- Mapping Modal -->
+    <div class="modal" id="mappingModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">✕</button>
+            <div class="modal-header">
+                <h2 id="modalTitle">🎯 Map Credentials from Image</h2>
+                <p>Drag text items to the appropriate fields below</p>
+            </div>
+            <div class="modal-body">
+                <!-- Selection Progress -->
+                <div class="selection-progress">
+                    <div class="current-selections">
+                        <div class="selection-display entity" data-field="entity">
+                            <div class="selection-label">🏢 Entity</div>
+                            <div class="selection-value" id="selectedEntity">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('entity')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('entity')">✕ Clear</button>
+                            </div>
+                        </div>
+                        <div class="selection-display username" data-field="username">
+                            <div class="selection-label">👤 Username/ID</div>
+                            <div class="selection-value" id="selectedUsername">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('username')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('username')">✕ Clear</button>
+                            </div>
+                        </div>
+                        <div class="selection-display password" data-field="password">
+                            <div class="selection-label">🔑 Password</div>
+                            <div class="selection-value" id="selectedPassword">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('password')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('password')">✕ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OCR Text List -->
+                <div class="ocr-section">
+                    <div class="section-title">📝 Extracted Text</div>
+                    <div class="instruction-text">
+                        <strong>🎯 How to use:</strong> Drag text items from the list below to the Entity, Username, or Password boxes above. Items will be automatically removed from the list once assigned.
+                    </div>
+                    
+                    <!-- Manual Text Input -->
+                    <div class="manual-input-section">
+                        <input type="text" class="manual-input" id="manualTextInput" placeholder="Type text manually if OCR missed something...">
+                        <button class="add-text-btn" onclick="addManualText()">➕ Add to List</button>
+                    </div>
+                    
+                    <div class="text-list" id="textList">
+                        <!-- OCR extracted text items will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="modal-actions">
+                    <button class="btn btn-reset" onclick="resetSelection()">🔄 Reset All</button>
+                    <button class="btn btn-cancel" onclick="closeModal()">❌ Cancel</button>
+                    <button class="btn btn-save" id="saveBtn" onclick="saveCredential()" disabled>💾 Save Credential</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-content">
+            <div class="confirm-icon" id="confirmIcon">⚠️</div>
+            <div class="confirm-title" id="confirmTitle">Confirm Action</div>
+            <div class="confirm-message" id="confirmMessage">Are you sure you want to proceed?</div>
+            <div class="confirm-actions">
+                <button class="confirm-btn cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="confirm-btn danger" id="confirmActionBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // Global state
+        let photos = [];
+        let passwords = [];
+        let filteredPasswords = [];
+        let currentPhoto = null;
+        let extractedTextItems = [];
+        let selections = { entity: '', username: '', password: '' };
+        let pendingAction = null;
+        let isAuthenticated = false;
+        let masterPasswordHash = null;
+
+        // Simple hash function for password storage
+        function simpleHash(password) {
+            let hash = 0;
+            if (password.length === 0) return hash;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString();
+        }
+
+        // Check if master password exists on startup
+        function checkMasterPassword() {
+            try {
+                const stored = localStorage.getItem('secureVaultMasterPassword');
+                if (stored && stored.trim() !== '') {
+                    masterPasswordHash = stored;
+                    showLoginScreen();
+                } else {
+                    showCreatePasswordScreen();
+                }
+            } catch (error) {
+                console.error('Error checking master password:', error);
+                showCreatePasswordScreen();
+            }
+        }
+
+        function showCreatePasswordScreen() {
+            document.getElementById('createPasswordScreen').style.display = 'block';
+            document.getElementById('loginPasswordScreen').style.display = 'none';
+        }
+
+        function showLoginScreen() {
+            document.getElementById('createPasswordScreen').style.display = 'none';
+            document.getElementById('loginPasswordScreen').style.display = 'block';
+        }
+
+        // Create new master password
+        function handleCreatePassword() {
+            const password = document.getElementById('newMasterPassword').value;
+            const confirmPassword = document.getElementById('confirmMasterPassword').value;
+            const errorDiv = document.getElementById('createPasswordError');
+            
+            // Clear previous error
+            errorDiv.style.display = 'none';
+            
+            // Validation
+            if (!password || !confirmPassword) {
+                showError(errorDiv, 'Please fill in both password fields.');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError(errorDiv, 'Password must be at least 6 characters long.');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError(errorDiv, 'Passwords don\'t match. Please try again.');
+                return;
+            }
+            
+            try {
+                // Store hashed password
+                masterPasswordHash = simpleHash(password);
+                localStorage.setItem('secureVaultMasterPassword', masterPasswordHash);
+                
+                // Clear form fields
+                document.getElementById('newMasterPassword').value = '';
+                document.getElementById('confirmMasterPassword').value = '';
+                
+                // Switch to login screen
+                showLoginScreen();
+                showNotification('🎉 Master password created successfully! Please login.');
+                
+            } catch (error) {
+                console.error('Error creating password:', error);
+                showError(errorDiv, 'Failed to create password. Please try again.');
+            }
+        }
+
+        // Login with existing password
+        function handleLogin() {
+            const password = document.getElementById('masterPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            // Clear previous error
+            errorDiv.style.display = 'none';
+            
+            if (!password) {
+                showError(errorDiv, 'Please enter your password.');
+                return;
+            }
+            
+            try {
+                const hashedInput = simpleHash(password);
+                
+                if (hashedInput === masterPasswordHash) {
+                    // Successful login
+                    isAuthenticated = true;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('mainApp').classList.add('authenticated');
+                    document.getElementById('masterPassword').value = '';
+                    showNotification('🎉 Welcome to SecureVault Pro!');
+                } else {
+                    // Invalid password
+                    showError(errorDiv, 'Invalid password. Please try again.');
+                    document.getElementById('masterPassword').value = '';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(errorDiv, 'Login failed. Please try again.');
+            }
+        }
+
+        function showError(errorDiv, message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 4000);
+        }
+
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+
+        // Reset master password
+        function resetMasterPassword() {
+            const confirmed = confirm('⚠️ This will delete your master password and you will need to create a new one. Are you sure?');
+            if (confirmed) {
+                try {
+                    localStorage.removeItem('secureVaultMasterPassword');
+                    masterPasswordHash = null;
+                    
+                    // Clear form fields
+                    document.getElementById('masterPassword').value = '';
+                    document.getElementById('newMasterPassword').value = '';
+                    document.getElementById('confirmMasterPassword').value = '';
+                    
+                    showCreatePasswordScreen();
+                    showNotification('🔄 Master password reset. Create a new password.');
+                } catch (error) {
+                    console.error('Error resetting password:', error);
+                    showNotification('❌ Failed to reset password', 'error');
+                }
+            }
+        }
+
+        function logout() {
+            isAuthenticated = false;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').classList.remove('authenticated');
+            
+            // Clear password fields
+            document.getElementById('masterPassword').value = '';
+            
+            // Close dropdown
+            document.getElementById('dropdownMenu').classList.remove('active');
+            
+            // Check which screen to show
+            checkMasterPassword();
+            showNotification('👋 Logged out successfully');
+        }
+
+        // Manual entry functions
+        window.openManualEntryModal = function() {
+            document.getElementById('manualEntryModal').classList.add('active');
+            clearManualEntryForm();
+        };
+
+        window.closeManualEntryModal = function() {
+            document.getElementById('manualEntryModal').classList.remove('active');
+            clearManualEntryForm();
+        };
+
+        function clearManualEntryForm() {
+            document.getElementById('manualEntity').value = '';
+            document.getElementById('manualUsername').value = '';
+            document.getElementById('manualPassword').value = '';
+            document.getElementById('manualPassword').type = 'password';
+            document.querySelector('.manual-password-toggle').textContent = '👁️';
+        }
+
+        window.toggleManualPassword = function() {
+            const passwordInput = document.getElementById('manualPassword');
+            const toggleButton = document.querySelector('.manual-password-toggle');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️';
+            }
+        };
+
+        window.saveManualCredential = function() {
+            const entity = document.getElementById('manualEntity').value.trim();
+            const username = document.getElementById('manualUsername').value.trim();
+            const password = document.getElementById('manualPassword').value.trim();
+            
+            // Validation
+            if (!entity) {
+                showNotification('❌ Please enter an entity/service name!', 'error');
+                document.getElementById('manualEntity').focus();
+                return;
+            }
+            
+            if (!username) {
+                showNotification('❌ Please enter a username or email!', 'error');
+                document.getElementById('manualUsername').focus();
+                return;
+            }
+            
+            if (!password) {
+                showNotification('❌ Please enter a password!', 'error');
+                document.getElementById('manualPassword').focus();
+                return;
+            }
+            
+            // Check for duplicates
+            const isDuplicate = passwords.some(pwd => 
+                pwd.entity.toLowerCase() === entity.toLowerCase() && 
+                pwd.username.toLowerCase() === username.toLowerCase()
+            );
+            
+            if (isDuplicate) {
+                const confirmed = confirm(`A credential for "${entity}" with username "${username}" already exists. Do you want to create another one?`);
+                if (!confirmed) return;
+            }
+            
+            // Create credential
+            const credential = {
+                id: Date.now() + Math.random(),
+                entity: entity,
+                username: username,
+                password: password,
+                extractedFrom: 'Manual Entry',
+                extractedDate: new Date().toLocaleDateString()
+            };
+            
+            passwords.push(credential);
+            renderPasswords();
+            closeManualEntryModal();
+            
+            showNotification(`🎉 Credential "${entity}" created successfully!`);
+            
+            // Switch to credentials tab
+            setTimeout(() => switchTab('passwords'), 1000);
+        };
+        function toggleDropdown() {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdown.classList.toggle('active');
+        }
+
+        function changePassword() {
+            document.getElementById('dropdownMenu').classList.remove('active');
+            
+            const confirmed = confirm('🔑 Do you want to change your master password? You will need to create a new one.');
+            if (confirmed) {
+                localStorage.removeItem('secureVaultMasterPassword');
+                masterPasswordHash = null;
+                
+                // Clear form fields
+                document.getElementById('masterPassword').value = '';
+                document.getElementById('newMasterPassword').value = '';
+                document.getElementById('confirmMasterPassword').value = '';
+                
+                showCreatePasswordScreen();
+                showNotification('🔄 Create your new master password.');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('dropdownMenu');
+            const menuBtn = document.querySelector('.menu-btn');
+            
+            if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
+        });
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            updateEmptyStates();
+        }
+
+        // Photo upload setup
+        const uploadArea = document.getElementById('uploadArea');
+        const photoInput = document.getElementById('photoInput');
+
+        uploadArea.addEventListener('click', () => photoInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        photoInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    await processImage(file);
+                }
+            }
+        }
+
+        async function processImage(file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const photoData = {
+                    id: Date.now() + Math.random(),
+                    name: file.name,
+                    data: e.target.result,
+                    uploadDate: new Date().toLocaleDateString(),
+                    extractedText: [],
+                    originalOrder: [],
+                    status: 'processing'
+                };
+                
+                photos.push(photoData);
+                renderPhotos();
+                showNotification(`📸 ${file.name} uploaded, starting OCR...`);
+                
+                await extractTextWithOCR(photoData);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function extractTextWithOCR(photoData) {
+            try {
+                showProcessing(true);
+                updateProgress(10, 'Initializing OCR engine...');
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                updateProgress(40, 'Analyzing image content...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                updateProgress(70, 'Extracting text patterns...');
+                await new Promise(resolve => setTimeout(resolve, 800));
+                updateProgress(90, 'Processing results...');
+
+                const sampleText = await simulateOCRExtraction(photoData.name);
+                const cleanedText = cleanAndFilterText(sampleText);
+                
+                photoData.extractedText = [...cleanedText];
+                photoData.originalOrder = [...cleanedText];
+                photoData.status = 'ready';
+                
+                updateProgress(100, 'OCR completed successfully!');
+                
+                setTimeout(() => {
+                    showProcessing(false);
+                    renderPhotos();
+                    showNotification(`✅ OCR completed! Found ${cleanedText.length} text items.`);
+                }, 500);
+                
+            } catch (error) {
+                console.error('OCR error:', error);
+                photoData.status = 'error';
+                showProcessing(false);
+                renderPhotos();
+                showNotification('❌ OCR extraction failed', 'error');
+            }
+        }
+
+        async function simulateOCRExtraction(filename) {
+            const baseTexts = [
+                'Gmail Login', 'john.doe@gmail.com', 'MySecurePassword123',
+                'Facebook', 'user@facebook.com', 'facebookPass456',
+                'Instagram', 'insta_user', 'InstaSecure789',
+                'LinkedIn', 'professional@linkedin.com', 'LinkedPass2023',
+                'Twitter', 'tweet_master', 'TwitterSafe2023',
+                'GitHub', 'developer@github.com', 'GitSecure456',
+                'Microsoft Account', 'ms.user@outlook.com', 'MSPassword789'
+            ];
+
+            const uiTexts = [
+                'Sign In', 'Login', 'Password', 'Username', 'Email', 'Remember Me',
+                'Forgot Password?', 'Create Account', 'Submit', 'Cancel', 'Welcome Back'
+            ];
+
+            return [...baseTexts, ...uiTexts];
+        }
+
+        function cleanAndFilterText(textArray) {
+            const uiWords = ['sign in', 'login', 'password', 'username', 'email', 'remember me', 
+                           'forgot password', 'create account', 'submit', 'cancel', 'welcome back', 
+                           'sign up', 'register', 'continue'];
+            
+            return textArray
+                .filter(text => text && text.trim().length > 2)
+                .filter(text => !uiWords.includes(text.trim().toLowerCase()))
+                .map(text => text.trim())
+                .filter((text, index, array) => array.indexOf(text) === index)
+                .slice(0, 12);
+        }
+
+        function showProcessing(show) {
+            const indicator = document.getElementById('processingIndicator');
+            const uploadArea = document.getElementById('uploadArea');
+            const progressContainer = document.getElementById('progressContainer');
+            
+            if (show) {
+                indicator.classList.add('show');
+                uploadArea.classList.add('processing');
+                progressContainer.style.display = 'block';
+            } else {
+                indicator.classList.remove('show');
+                uploadArea.classList.remove('processing');
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        function updateProgress(percent, text = '') {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            progressFill.style.width = percent + '%';
+            if (text) progressText.textContent = text;
+        }
+
+        function renderPhotos() {
+            const photoGrid = document.getElementById('photoGrid');
+            photoGrid.innerHTML = '';
+            
+            photos.forEach(photo => {
+                const photoItem = document.createElement('div');
+                photoItem.className = 'photo-item bounce-in';
+                
+                let statusText = '📝 Ready to map';
+                let statusClass = 'ready';
+                let buttonText = 'Map';
+                let buttonDisabled = false;
+                let showStatus = false;
+                
+                if (photo.status === 'processing') {
+                    statusText = '⏳ Processing...';
+                    statusClass = 'processing';
+                    buttonText = 'Wait';
+                    buttonDisabled = true;
+                    showStatus = true;
+                } else if (photo.status === 'error') {
+                    statusText = '❌ OCR Failed';
+                    statusClass = 'error';
+                    buttonText = 'Retry';
+                    showStatus = true;
+                } else if (photo.extractedText && photo.extractedText.length === 0) {
+                    statusText = '⚠️ No text found';
+                    statusClass = 'error';
+                    showStatus = true;
+                }
+                
+                photoItem.innerHTML = `
+                    <img src="${photo.data}" alt="${photo.name}" onclick="openPhotoModal('${photo.id}')">
+                    ${showStatus ? `<div class="extract-status ${statusClass}">${statusText}</div>` : ''}
+                    <div class="photo-overlay">
+                        <div class="photo-actions">
+                            <button class="map-btn" onclick="openMappingModal('${photo.id}')" ${buttonDisabled ? 'disabled' : ''}>${buttonText}</button>
+                            <button class="delete-btn" onclick="confirmDeletePhoto('${photo.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+                photoGrid.appendChild(photoItem);
+            });
+            updateEmptyStates();
+        }
+
+        // Photo modal functions
+        function openPhotoModal(photoId) {
+            const photo = photos.find(p => p.id == photoId);
+            if (photo) {
+                document.getElementById('photoModalImage').src = photo.data;
+                document.getElementById('photoModal').classList.add('active');
+            }
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.remove('active');
+        }
+
+        function openMappingModal(photoId) {
+            currentPhoto = photos.find(p => p.id == photoId);
+            if (!currentPhoto || currentPhoto.status !== 'ready') {
+                showNotification('❌ Photo is not ready for mapping yet!', 'error');
+                return;
+            }
+
+            extractedTextItems = currentPhoto.extractedText ? [...currentPhoto.extractedText] : [];
+            resetSelectionState();
+            
+            document.getElementById('mappingModal').classList.add('active');
+            document.getElementById('modalTitle').textContent = `🎯 Map Credentials from "${currentPhoto.name}"`;
+            
+            populateTextList();
+        }
+
+        function resetSelectionState() {
+            selections = { entity: '', username: '', password: '' };
+            
+            document.getElementById('selectedEntity').textContent = 'Drop text here';
+            document.getElementById('selectedUsername').textContent = 'Drop text here';
+            document.getElementById('selectedPassword').textContent = 'Drop text here';
+            
+            document.querySelectorAll('.selection-controls').forEach(control => {
+                control.style.display = 'none';
+            });
+            
+            document.querySelectorAll('.selection-value').forEach(val => {
+                val.classList.remove('filled');
+            });
+            
+            document.getElementById('saveBtn').disabled = true;
+        }
+
+        function populateTextList() {
+            const textList = document.getElementById('textList');
+            textList.innerHTML = '';
+            
+            if (extractedTextItems.length === 0) {
+                textList.innerHTML = '<div class="text-item" style="text-align: center; color: #9ca3af; cursor: default;">No text available - try adding manually</div>';
+                return;
+            }
+            
+            extractedTextItems.forEach((text, index) => {
+                const item = document.createElement('div');
+                item.className = 'text-item';
+                item.innerHTML = `
+                    ${text}
+                    <span class="text-item-index">${index + 1}</span>
+                `;
+                item.draggable = true;
+                item.dataset.index = index;
+                item.dataset.text = text;
+                item.dataset.originalIndex = currentPhoto.originalOrder.indexOf(text);
+                
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                
+                item.onclick = (e) => {
+                    if (!e.target.classList.contains('text-item-index')) {
+                        selectTextByClick(text, index);
+                    }
+                };
+                
+                textList.appendChild(item);
+            });
+            
+            setupDropZones();
+        }
+
+        function setupDropZones() {
+            const dropZones = document.querySelectorAll('.selection-display');
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('drop', handleDrop);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.text);
+            e.dataTransfer.setData('text/index', e.target.dataset.index);
+            e.dataTransfer.setData('text/originalIndex', e.target.dataset.originalIndex);
+            e.target.classList.add('dragging');
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.closest('.selection-display').classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            if (!e.target.closest('.selection-display').contains(e.relatedTarget)) {
+                e.target.closest('.selection-display').classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropZone = e.target.closest('.selection-display');
+            dropZone.classList.remove('drag-over');
+            
+            const text = e.dataTransfer.getData('text/plain');
+            const index = parseInt(e.dataTransfer.getData('text/index'));
+            const originalIndex = parseInt(e.dataTransfer.getData('text/originalIndex'));
+            const field = dropZone.dataset.field;
+            
+            if (text && field) {
+                setSelectionValue(field, text, originalIndex);
+                removeTextFromList(index);
+                showNotification(`✅ "${text}" assigned to ${field}!`);
+            }
+        }
+
+        function removeTextFromList(index) {
+            extractedTextItems.splice(index, 1);
+            populateTextList();
+        }
+
+        function setSelectionValue(field, value, originalIndex = -1) {
+            selections[field] = value;
+            selections[field + '_originalIndex'] = originalIndex;
+            
+            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
+            displayElement.textContent = value;
+            displayElement.classList.add('filled');
+            
+            const container = displayElement.closest('.selection-display');
+            container.querySelector('.selection-controls').style.display = 'none';
+            
+            populateTextList();
+            
+            const allFilled = selections.entity && selections.username && selections.password;
+            document.getElementById('saveBtn').disabled = !allFilled;
+            
+            showNotification(`🔄 ${field} cleared and returned to original position`);
+        }
+
+        function editSelection(field) {
+            const currentValue = selections[field];
+            const newValue = prompt(`Edit ${field}:`, currentValue);
+            
+            if (newValue && newValue.trim() && newValue.trim() !== currentValue) {
+                setSelectionValue(field, newValue.trim(), -1);
+                showNotification(`✅ ${field} updated to "${newValue.trim()}"`);
+            }
+        }
+
+        function selectTextByClick(text, index) {
+            const field = prompt('Select field for "' + text + '":\n1. Entity\n2. Username\n3. Password\n\nType: entity, username, or password');
+            
+            if (field && ['entity', 'username', 'password'].includes(field.toLowerCase())) {
+                const originalIndex = currentPhoto.originalOrder.indexOf(text);
+                setSelectionValue(field.toLowerCase(), text, originalIndex);
+                removeTextFromList(index);
+                showNotification(`✅ "${text}" assigned to ${field}!`);
+            }
+        }
+
+        function addManualText() {
+            const input = document.getElementById('manualTextInput');
+            const text = input.value.trim();
+            
+            if (text && !extractedTextItems.includes(text)) {
+                // Add to the beginning of the array (top of list)
+                extractedTextItems.unshift(text);
+                populateTextList();
+                input.value = '';
+                showNotification(`✅ "${text}" added to top of list`);
+            } else if (extractedTextItems.includes(text)) {
+                showNotification('❌ Text already exists in list', 'error');
+            } else {
+                showNotification('❌ Please enter some text', 'error');
+            }
+        }
+
+        function resetSelection() {
+            ['entity', 'username', 'password'].forEach(field => {
+                if (selections[field]) {
+                    clearSelection(field);
+                }
+            });
+            showNotification('🔄 All selections reset');
+        }
+
+        function saveCredential() {
+            if (!selections.entity || !selections.username || !selections.password) {
+                showNotification('❌ Please fill all fields!', 'error');
+                return;
+            }
+
+            const credential = {
+                id: Date.now() + Math.random(),
+                entity: selections.entity,
+                username: selections.username,
+                password: selections.password,
+                extractedFrom: currentPhoto.name,
+                extractedDate: new Date().toLocaleDateString()
+            };
+
+            passwords.push(credential);
+            renderPasswords();
+            closeModal();
+            
+            showNotification(`🎉 Credential "${selections.entity}" saved successfully!`);
+            setTimeout(() => switchTab('passwords'), 1500);
+        }
+
+        function closeModal() {
+            document.getElementById('mappingModal').classList.remove('active');
+            document.getElementById('manualTextInput').value = '';
+            resetSelectionState();
+        }
+
+        function renderPasswords() {
+            const passwordRows = document.getElementById('passwordRows');
+            passwordRows.innerHTML = '';
+            
+            passwords.forEach(pwd => {
+                const row = document.createElement('div');
+                row.className = 'table-row bounce-in';
+                row.innerHTML = `
+                    <div class="cell entity">
+                        <span id="entity-${pwd.id}">${pwd.entity}</span>
+                        <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell">
+                        <span id="username-${pwd.id}">${pwd.username}</span>
+                        <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell password">
+                        <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                        <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                        <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                    </div>
+                    <div class="cell actions">
+                        <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                        <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                        <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                        <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                        <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                    </div>
+                `;
+                passwordRows.appendChild(row);
+            });
+            updateEmptyStates();
+        }
+
+        function togglePassword(passwordId) {
+            const passwordDisplay = document.getElementById(`pwd-${passwordId}`);
+            const password = passwords.find(p => p.id == passwordId);
+            passwordDisplay.textContent = passwordDisplay.textContent === '••••••••' ? password.password : '••••••••';
+        }
+
+        function copyPassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            navigator.clipboard.writeText(password.password).then(() => {
+                showNotification('📋 Password copied to clipboard!');
+            });
+        }
+
+        function editCredential(passwordId) {
+            document.getElementById(`entity-${passwordId}`).style.display = 'none';
+            document.getElementById(`username-${passwordId}`).style.display = 'none';
+            document.getElementById(`pwd-${passwordId}`).style.display = 'none';
+            document.getElementById(`toggle-${passwordId}`).style.display = 'none';
+            
+            document.getElementById(`edit-entity-${passwordId}`).style.display = 'block';
+            document.getElementById(`edit-username-${passwordId}`).style.display = 'block';
+            document.getElementById(`edit-password-${passwordId}`).style.display = 'block';
+            
+            document.getElementById(`copy-${passwordId}`).style.display = 'none';
+            document.getElementById(`edit-${passwordId}`).style.display = 'none';
+            document.getElementById(`save-${passwordId}`).style.display = 'inline-block';
+            document.getElementById(`cancel-${passwordId}`).style.display = 'inline-block';
+        }
+
+        function saveEdit(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            
+            const newEntity = document.getElementById(`edit-entity-${passwordId}`).value.trim();
+            const newUsername = document.getElementById(`edit-username-${passwordId}`).value.trim();
+            const newPassword = document.getElementById(`edit-password-${passwordId}`).value.trim();
+            
+            if (!newEntity || !newUsername || !newPassword) {
+                showNotification('❌ All fields are required!', 'error');
+                return;
+            }
+            
+            password.entity = newEntity;
+            password.username = newUsername;
+            password.password = newPassword;
+            
+            renderPasswords();
+            showNotification('✅ Credential updated successfully!');
+        }
+
+        function cancelEdit(passwordId) {
+            renderPasswords();
+            showNotification('❌ Edit cancelled');
+        }
+
+        function confirmDeletePhoto(photoId) {
+            showConfirmModal(
+                '🗑️',
+                'Delete Photo?',
+                'This will permanently delete the photo and its extracted text. This action cannot be undone.',
+                'Delete Photo',
+                () => deletePhoto(photoId)
+            );
+        }
+
+        function confirmDeletePassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            showConfirmModal(
+                '🗑️',
+                'Delete Credential?',
+                `This will permanently delete the credential for "${password.entity}". This action cannot be undone.`,
+                'Delete Credential',
+                () => deletePassword(passwordId)
+            );
+        }
+
+        function showConfirmModal(icon, title, message, actionText, actionCallback) {
+            document.getElementById('confirmIcon').textContent = icon;
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmActionBtn').textContent = actionText;
+            
+            pendingAction = actionCallback;
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+            pendingAction = null;
+        }
+
+        function confirmAction() {
+            if (pendingAction) {
+                pendingAction();
+                pendingAction = null;
+            }
+            closeConfirmModal();
+        }
+
+        function deletePhoto(photoId) {
+            const photo = photos.find(p => p.id == photoId);
+            photos = photos.filter(photo => photo.id != photoId);
+            renderPhotos();
+            showNotification(`🗑️ Photo "${photo.name}" deleted successfully`);
+        }
+
+        function deletePassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            passwords = passwords.filter(p => p.id != passwordId);
+            renderPasswords();
+            showNotification(`🗑️ Credential "${password.entity}" deleted successfully`);
+        }
+
+        function updateEmptyStates() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            const hasResults = filteredPasswords.length > 0;
+            const isSearching = searchTerm !== '';
+            
+            // Show/hide different states
+            document.getElementById('photoEmptyState').style.display = photos.length === 0 ? 'block' : 'none';
+            
+            document.getElementById('passwordEmptyState').style.display = 
+                passwords.length === 0 && !isSearching ? 'block' : 'none';
+            
+            document.getElementById('noSearchResults').style.display = 
+                isSearching && !hasResults ? 'block' : 'none';
+            
+            document.getElementById('passwordTable').style.display = 
+                (passwords.length === 0 && !isSearching) || (isSearching && !hasResults) ? 'none' : 'block';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 4000);
+        }
+
+        // Event listeners
+        document.getElementById('mappingModal').addEventListener('click', (e) => {
+            if (e.target.id === 'mappingModal') closeModal();
+        });
+
+        document.getElementById('confirmModal').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmModal') closeConfirmModal();
+        });
+
+        document.getElementById('photoModal').addEventListener('click', (e) => {
+            if (e.target.id === 'photoModal') closePhotoModal();
+        });
+
+        document.getElementById('manualEntryModal').addEventListener('click', (e) => {
+            if (e.target.id === 'manualEntryModal') closeManualEntryModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeConfirmModal();
+                closePhotoModal();
+                closeManualEntryModal();
+            }
+            if (e.key === 'Enter') {
+                if (document.getElementById('manualTextInput') === document.activeElement) {
+                    addManualText();
+                } else if (document.getElementById('masterPassword') === document.activeElement) {
+                    handleLogin();
+                } else if (document.getElementById('newMasterPassword') === document.activeElement || 
+                          document.getElementById('confirmMasterPassword') === document.activeElement) {
+                    handleCreatePassword();
+                } else if (document.getElementById('manualEntity') === document.activeElement ||
+                          document.getElementById('manualUsername') === document.activeElement ||
+                          document.getElementById('manualPassword') === document.activeElement) {
+                    saveManualCredential();
+                }
+            }
+        });
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize filtered passwords array
+            filteredPasswords = [];
+            
+            // Check if master password exists and show appropriate screen
+            checkMasterPassword();
+            
+            // Show login screen initially
+            document.getElementById('loginScreen').style.display = 'flex';
+            
+            // Initialize the app state
+            renderPhotos();
+            renderPasswords();
+            updateEmptyStates();
+        });
+    </script>
+</body>
+</html>flex';
+            
+            const allFilled = selections.entity && selections.username && selections.password;
+            document.getElementById('saveBtn').disabled = !allFilled;
+            
+            if (allFilled) {
+                showNotification('🎉 All fields filled! Ready to save credential.');
+            }
+        }
+
+        function clearSelection(field) {
+            const text = selections[field];
+            const originalIndex = selections[field + '_originalIndex'] || -1;
+            
+            if (text) {
+                if (originalIndex >= 0 && originalIndex < currentPhoto.originalOrder.length) {
+                    let insertIndex = 0;
+                    for (let i = 0; i < extractedTextItems.length; i++) {
+                        const itemOriginalIndex = currentPhoto.originalOrder.indexOf(extractedTextItems[i]);
+                        if (itemOriginalIndex > originalIndex) {
+                            insertIndex = i;
+                            break;
+                        }
+                        insertIndex = i + 1;
+                    }
+                    extractedTextItems.splice(insertIndex, 0, text);
+                } else {
+                    extractedTextItems.push(text);
+                }
+            }
+            
+            selections[field] = '';
+            selections[field + '_originalIndex'] = -1;
+            
+            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
+            displayElement.textContent = 'Drop text here';
+            displayElement.classList.remove('filled');
+            
+            const container = displayElement.closest('.selection-display');
+            container.querySelector('.selection-controls').style.display = '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Magic Code for Mobile App Experience -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SecureVault Pro">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    
+    <!-- App Icons and Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/4f46e5/ffffff?text=🔐">
+    <link rel="icon" type="image/x-icon" href="https://via.placeholder.com/32x32/4f46e5/ffffff?text=🔐">
+    
+    <title>SecureVault Pro - AI Credential Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: loginAppear 0.5s ease;
+        }
+
+        @keyframes loginAppear {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-header {
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .password-input-container {
+            position: relative;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 16px;
+            padding-right: 50px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+
+        .password-toggle:hover {
+            opacity: 1;
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .login-error {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+            padding: 10px;
+            background: #fef2f2;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+        }
+
+        .reset-password-btn {
+            background: none !important;
+            border: none !important;
+            color: #6b7280 !important;
+            font-size: 14px !important;
+            margin-top: 16px !important;
+            cursor: pointer !important;
+            text-decoration: underline !important;
+        }
+
+        .reset-password-btn:hover {
+            color: #ef4444 !important;
+        }
+
+        /* Main App */
+        .app {
+            display: none;
+        }
+
+        .app.authenticated {
+            display: block;
+        }
+
+        .container {
+            max-width: 414px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .header h1 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+
+        .menu-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            display: none;
+            z-index: 100;
+            min-width: 180px;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+            animation: dropdownAppear 0.2s ease;
+        }
+
+        @keyframes dropdownAppear {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            text-align: left;
+            border: none;
+            background: none;
+            color: #374151;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .dropdown-item:hover {
+            background: #f8fafc;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+            color: #ef4444;
+        }
+
+        .dropdown-item:last-child:hover {
+            background: #fef2f2;
+        }
+
+        .tab-container {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; background: white; }
+        .tab:hover { background: #f1f5f9; }
+        .tab-icon { font-size: 20px; margin-bottom: 4px; display: block; }
+
+        .content { padding: 20px; min-height: calc(100vh - 200px); }
+        .section { display: none; animation: fadeIn 0.3s ease; }
+        .section.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.dragover { 
+            border-color: #4f46e5; 
+            background: #f0f4ff;
+            transform: translateY(-2px);
+        }
+        .upload-area.processing { border-color: #f59e0b; background: #fef3c7; }
+        
+        .upload-icon { font-size: 48px; color: #94a3b8; margin-bottom: 16px; display: block; }
+        .upload-text { color: #64748b; font-size: 16px; margin-bottom: 8px; }
+        .upload-subtext { color: #94a3b8; font-size: 14px; }
+
+        .processing-indicator {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #f59e0b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .processing-indicator.show { display: block; }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        /* Photo Grid */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .photo-item:hover { 
+            transform: scale(1.05) rotate(1deg);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+
+        .photo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.8));
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .photo-item:hover .photo-overlay { opacity: 1; }
+
+        .photo-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .extract-status { 
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #10b981; 
+            color: white; 
+            border-radius: 4px; 
+            padding: 2px 6px; 
+            font-size: 10px; 
+            font-weight: 500;
+            animation: statusFadeOut 1s ease 1s forwards;
+        }
+        .extract-status.processing { 
+            background: #f59e0b; 
+            animation: none;
+        }
+        .extract-status.ready { 
+            background: #3b82f6;
+        }
+
+        @keyframes statusFadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .map-btn, .delete-btn { 
+            border: none; 
+            border-radius: 6px; 
+            padding: 6px 12px; 
+            font-size: 12px; 
+            cursor: pointer; 
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .map-btn { background: #3b82f6; color: white; }
+        .map-btn:hover { background: #2563eb; transform: translateY(-1px); }
+        .delete-btn { background: #ef4444; color: white; }
+        .delete-btn:hover { background: #dc2626; transform: translateY(-1px); }
+
+        /* Photo Modal */
+        .photo-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-modal.active {
+            display: flex;
+        }
+
+        .photo-modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .photo-modal img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .photo-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .photo-modal-close:hover {
+            background: rgba(0,0,0,0.9);
+            transform: rotate(90deg);
+        }
+
+        /* Manual Entry Button */
+        .manual-entry-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .manual-entry-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .manual-entry-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .manual-entry-icon {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .manual-entry-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .manual-entry-subtext {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .empty-manual-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .empty-manual-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+        }
+
+        .clear-search.show {
+            display: block;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active { 
+            display: block; 
+            animation: modalAppear 0.3s ease;
+        }
+
+        @keyframes modalAppear {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            max-width: 95%;
+            margin: 20px auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            animation: contentSlide 0.4s ease;
+        }
+
+        @keyframes contentSlide {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .close-modal { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            background: rgba(0,0,0,0.3); 
+            color: white; 
+            border: none; 
+            border-radius: 50%; 
+            width: 30px; 
+            height: 30px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: rgba(0,0,0,0.5);
+            transform: rotate(90deg);
+        }
+
+        /* Selection Display with Edit Options */
+        .selection-progress {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .current-selections {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .selection-display {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            font-size: 14px;
+            position: relative;
+            min-height: 100px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .selection-display:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .selection-display.entity { border-color: #ef4444; }
+        .selection-display.username { border-color: #10b981; }
+        .selection-display.password { border-color: #f59e0b; }
+
+        .selection-display.drag-over {
+            border-style: dashed;
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .selection-display.entity.drag-over { background: rgba(239, 68, 68, 0.1); }
+        .selection-display.username.drag-over { background: rgba(16, 185, 129, 0.1); }
+        .selection-display.password.drag-over { background: rgba(245, 158, 11, 0.1); }
+
+        .selection-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 16px;
+        }
+
+        .selection-value {
+            color: #64748b;
+            word-break: break-word;
+            min-height: 20px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .selection-value.filled {
+            color: #374151;
+            font-weight: 500;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .selection-value.filled:hover {
+            background: #f1f5f9;
+        }
+
+        .selection-edit-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #3b82f6;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            background: white;
+        }
+
+        .selection-edit-input:focus {
+            outline: none;
+            border-color: #1d4ed8;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .selection-controls {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .selection-edit-btn, .selection-clear-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .selection-edit-btn {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .selection-edit-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .selection-clear-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .selection-clear-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        /* OCR Text List with Drag Support */
+        .ocr-section {
+            margin-top: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instruction-text {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 14px;
+            color: #1e40af;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .manual-input-section {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .manual-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .manual-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .add-text-btn {
+            margin-top: 8px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .add-text-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .text-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .text-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: grab;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+            user-select: none;
+            background: white;
+        }
+
+        .text-item:last-child { border-bottom: none; }
+
+        .text-item:hover {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(4px);
+        }
+
+        .text-item:active {
+            cursor: grabbing;
+        }
+
+        .text-item.dragging {
+            opacity: 0.6;
+            transform: rotate(3deg) scale(0.95);
+            z-index: 1000;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .text-item-index {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e5e7eb;
+            color: #6b7280;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        /* Action Buttons */
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-save:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+        .btn-save:disabled { 
+            background: #d1d5db; 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-cancel {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            color: white;
+        }
+
+        .btn-cancel:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(107, 114, 128, 0.3);
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-reset:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Password Table */
+        .password-table {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 80px;
+            gap: 1px;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 80px;
+            gap: 1px;
+            padding: 16px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.3s ease;
+            align-items: center;
+        }
+
+        .table-row:hover { 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(2px);
+        }
+        .table-row:last-child { border-bottom: none; }
+
+        .cell {
+            font-size: 14px;
+            color: #374151;
+            word-break: break-word;
+        }
+
+        .cell.entity { font-weight: 600; color: #1f2937; }
+        .cell.password { 
+            font-family: 'SF Mono', Monaco, monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .password-text { flex: 1; }
+        .toggle-pwd { 
+            background: none; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 16px; 
+            opacity: 0.6;
+            transition: all 0.2s ease;
+        }
+        .toggle-pwd:hover { 
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            padding: 6px;
+            border-radius: 4px;
+        }
+
+        .action-btn:hover { 
+            opacity: 1;
+            transform: translateY(-1px);
+        }
+        .copy-btn:hover { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .edit-btn:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        .delete-password-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+        /* Confirmation Modal */
+        .confirm-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-modal.active {
+            display: flex;
+        }
+
+        .confirm-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            animation: confirmAppear 0.3s ease;
+        }
+
+        @keyframes confirmAppear {
+            from { transform: scale(0.7); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .confirm-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .confirm-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .confirm-message {
+            color: #6b7280;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .confirm-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-btn.danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .confirm-btn.danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .confirm-btn.cancel {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .confirm-btn.cancel:hover {
+            background: #e5e7eb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-icon { 
+            font-size: 72px; 
+            margin-bottom: 20px; 
+            display: block;
+            opacity: 0.7;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            z-index: 1001;
+            opacity: 0;
+            transition: all 0.4s ease;
+            max-width: 350px;
+            text-align: center;
+            font-weight: 500;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .notification.show { 
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
+        }
+        .notification.error { 
+            background: #ef4444;
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0
