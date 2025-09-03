@@ -1934,18 +1934,9 @@
         }
 
         function cleanAndFilterText(textArray) {
-            // Filter and clean the extracted text from OCR
-            const uiWords = ['sign in', 'login', 'password', 'username', 'email', 'remember me', 
-                           'forgot password', 'create account', 'submit', 'cancel', 'welcome back', 
-                           'sign up', 'register', 'continue', 'loading', 'please wait'];
-            
-            return textArray
-                .filter(text => text && typeof text === 'string' && text.trim().length > 2)
-                .filter(text => !uiWords.includes(text.trim().toLowerCase()))
-                .filter(text => !/^[\s\.\-_]+$/.test(text)) // Filter out lines with only symbols/spaces
-                .map(text => text.trim())
-                .filter((text, index, array) => array.indexOf(text) === index) // Remove duplicates
-                .slice(0, 15); // Limit to 15 items
+            // Since we can't actually extract text from images in a browser environment,
+            // just return empty array. Users must add text manually.
+            return [];
         }
 
         function showProcessing(show) {
