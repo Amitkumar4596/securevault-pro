@@ -1,98 +1,1225 @@
-function renderPasswords() {
-            const passwordRows = document.getElementById('passwordRows');
-            if (!passwordRows) return;
-            
-            passwordRows.innerHTML = '';
-            
-            // Use filtered passwords if search is active
-            const searchInput = document.getElementById('searchInput');
-            const searchTerm = searchInput ? searchInput.value.trim() : '';
-            const passwordsToShow = searchTerm !== '' ? filteredPasswords : passwords;
-            
-            passwordsToShow.forEach(pwd => {
-                const row = document.createElement('div');
-                row.className = 'table-row bounce-in';
-                
-                // Create the row HTML properly
-                const entityCell = document.createElement('div');
-                entityCell.className = 'cell entity';
-                entityCell.innerHTML = `
-                    <span id="entity-${pwd.id}">${pwd.entity}</span>
-                    <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                `;
-                
-                const usernameCell = document.createElement('div');
-                usernameCell.className = 'cell';
-                usernameCell.innerHTML = `
-                    <span id="username-${pwd.id}">${pwd.username}</span>
-                    <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                `;
-                
-                const passwordCell = document.createElement('div');
-                passwordCell.className = 'cell password';
-                passwordCell.innerHTML = `
-                    <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
-                    <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                    <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
-                `;
-                
-                const actionsCell = document.createElement('div');
-                actionsCell.className = 'cell actions';
-                actionsCell.innerHTML = `
-                    <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
-                    <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
-                    <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
-                    <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
-                    <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
-                `;
-                
-                row.appendChild(entityCell);
-                row.appendChild(usernameCell);
-                row.appendChild(passwordCell);
-                row.appendChild(actionsCell);
-                
-                passwordRows.appendChild(row);
-            });
-            
-            updateEmptyStates();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Magic Code for Mobile App Experience -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SecureVault Pro">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    
+    <!-- App Icons and Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/4f46e5/ffffff?text=🔐">
+    <link rel="icon" type="image/x-icon" href="https://via.placeholder.com/32x32/4f46e5/ffffff?text=🔐">
+    
+    <title>SecureVault Pro - AI Credential Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
         }
 
-        // Search functionality - Define globally to ensure accessibility
-        window.searchCredentials = function() {
-            const searchInput = document.getElementById('searchInput');
-            const clearBtn = document.getElementById('clearSearch');
-            
-            if (!searchInput || !clearBtn) return;
-            
-            const searchTerm = searchInput.value.toLowerCase().trim();
-            
-            if (searchTerm === '') {
-                filteredPasswords = [];
-                clearBtn.classList.remove('show');
-            } else {
-                filteredPasswords = passwords.filter(pwd => 
-                    pwd.entity.toLowerCase().includes(searchTerm) ||
-                    pwd.username.toLowerCase().includes(searchTerm)
-                );
-                clearBtn.classList.add('show');
-            }
-            
-            renderPasswords();
-            updateEmptyStates();
-        };
+        /* Login Screen */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
 
-        window.clearSearch = function() {
-            const searchInput = document.getElementById('searchInput');
-            const clearBtn = document.getElementById('clearSearch');
-            
-            if (!searchInput || !clearBtn) return;
-            
-            searchInput.value = '';
-            clearBtn.classList.remove('show');
-            filteredPasswords = [];
-            renderPasswords();
-            updateEmptyStates();
-        };        @keyframes bounceIn {
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: loginAppear 0.5s ease;
+        }
+
+        @keyframes loginAppear {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-header {
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .password-input-container {
+            position: relative;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 16px;
+            padding-right: 50px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+
+        .password-toggle:hover {
+            opacity: 1;
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .login-error {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+            padding: 10px;
+            background: #fef2f2;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+        }
+
+        .reset-password-btn {
+            background: none !important;
+            border: none !important;
+            color: #6b7280 !important;
+            font-size: 14px !important;
+            margin-top: 16px !important;
+            cursor: pointer !important;
+            text-decoration: underline !important;
+        }
+
+        .reset-password-btn:hover {
+            color: #ef4444 !important;
+        }
+
+        /* Main App */
+        .app {
+            display: none;
+        }
+
+        .app.authenticated {
+            display: block;
+        }
+
+        .container {
+            max-width: 414px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .header h1 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+
+        .menu-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            display: none;
+            z-index: 100;
+            min-width: 180px;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+            animation: dropdownAppear 0.2s ease;
+        }
+
+        @keyframes dropdownAppear {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            text-align: left;
+            border: none;
+            background: none;
+            color: #374151;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .dropdown-item:hover {
+            background: #f8fafc;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+            color: #ef4444;
+        }
+
+        .dropdown-item:last-child:hover {
+            background: #fef2f2;
+        }
+
+        .tab-container {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; background: white; }
+        .tab:hover { background: #f1f5f9; }
+        .tab-icon { font-size: 20px; margin-bottom: 4px; display: block; }
+
+        .content { padding: 20px; min-height: calc(100vh - 200px); }
+        .section { display: none; animation: fadeIn 0.3s ease; }
+        .section.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.dragover { 
+            border-color: #4f46e5; 
+            background: #f0f4ff;
+            transform: translateY(-2px);
+        }
+        .upload-area.processing { border-color: #f59e0b; background: #fef3c7; }
+        
+        .upload-icon { font-size: 48px; color: #94a3b8; margin-bottom: 16px; display: block; }
+        .upload-text { color: #64748b; font-size: 16px; margin-bottom: 8px; }
+        .upload-subtext { color: #94a3b8; font-size: 14px; }
+
+        .processing-indicator {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #f59e0b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .processing-indicator.show { display: block; }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        /* Photo Grid */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .photo-item:hover { 
+            transform: scale(1.05) rotate(1deg);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+
+        .photo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.8));
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .photo-item:hover .photo-overlay { opacity: 1; }
+
+        .photo-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .extract-status { 
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #10b981; 
+            color: white; 
+            border-radius: 4px; 
+            padding: 2px 6px; 
+            font-size: 10px; 
+            font-weight: 500;
+            animation: statusFadeOut 1s ease 1s forwards;
+        }
+        .extract-status.processing { 
+            background: #f59e0b; 
+            animation: none;
+        }
+        .extract-status.ready { 
+            background: #3b82f6;
+        }
+
+        @keyframes statusFadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .map-btn, .delete-btn { 
+            border: none; 
+            border-radius: 6px; 
+            padding: 6px 12px; 
+            font-size: 12px; 
+            cursor: pointer; 
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .map-btn { background: #3b82f6; color: white; }
+        .map-btn:hover { background: #2563eb; transform: translateY(-1px); }
+        .delete-btn { background: #ef4444; color: white; }
+        .delete-btn:hover { background: #dc2626; transform: translateY(-1px); }
+
+        /* Photo Modal */
+        .photo-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-modal.active {
+            display: flex;
+        }
+
+        .photo-modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .photo-modal img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .photo-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .photo-modal-close:hover {
+            background: rgba(0,0,0,0.9);
+            transform: rotate(90deg);
+        }
+
+        /* Manual Entry Button */
+        .manual-entry-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .manual-entry-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .manual-entry-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .manual-entry-icon {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .manual-entry-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .manual-entry-subtext {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .empty-manual-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .empty-manual-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+        }
+
+        .clear-search.show {
+            display: block;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active { 
+            display: block; 
+            animation: modalAppear 0.3s ease;
+        }
+
+        @keyframes modalAppear {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            max-width: 95%;
+            margin: 20px auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            animation: contentSlide 0.4s ease;
+        }
+
+        @keyframes contentSlide {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .close-modal { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            background: rgba(0,0,0,0.3); 
+            color: white; 
+            border: none; 
+            border-radius: 50%; 
+            width: 30px; 
+            height: 30px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: rgba(0,0,0,0.5);
+            transform: rotate(90deg);
+        }
+
+        /* Manual Entry Modal Fields */
+        .manual-field-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .manual-field-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .manual-password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+
+        .manual-password-toggle:hover {
+            opacity: 1;
+        }
+
+        /* Selection Display with Edit Options */
+        .selection-progress {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .current-selections {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .selection-display {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            font-size: 14px;
+            position: relative;
+            min-height: 100px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .selection-display:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .selection-display.entity { border-color: #ef4444; }
+        .selection-display.username { border-color: #10b981; }
+        .selection-display.password { border-color: #f59e0b; }
+
+        .selection-display.drag-over {
+            border-style: dashed;
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .selection-display.entity.drag-over { background: rgba(239, 68, 68, 0.1); }
+        .selection-display.username.drag-over { background: rgba(16, 185, 129, 0.1); }
+        .selection-display.password.drag-over { background: rgba(245, 158, 11, 0.1); }
+
+        .selection-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 16px;
+        }
+
+        .selection-value {
+            color: #64748b;
+            word-break: break-word;
+            min-height: 20px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .selection-value.filled {
+            color: #374151;
+            font-weight: 500;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .selection-value.filled:hover {
+            background: #f1f5f9;
+        }
+
+        .selection-controls {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .selection-edit-btn, .selection-clear-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .selection-edit-btn {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .selection-edit-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .selection-clear-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .selection-clear-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        /* OCR Text List with Drag Support */
+        .ocr-section {
+            margin-top: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instruction-text {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 14px;
+            color: #1e40af;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .manual-input-section {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .manual-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .manual-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .add-text-btn {
+            margin-top: 8px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .add-text-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .text-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .text-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: grab;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+            user-select: none;
+            background: white;
+        }
+
+        .text-item:last-child { border-bottom: none; }
+
+        .text-item:hover {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(4px);
+        }
+
+        .text-item:active {
+            cursor: grabbing;
+        }
+
+        .text-item.dragging {
+            opacity: 0.6;
+            transform: rotate(3deg) scale(0.95);
+            z-index: 1000;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .text-item-index {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e5e7eb;
+            color: #6b7280;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        /* Action Buttons */
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-save:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+        .btn-save:disabled { 
+            background: #d1d5db; 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-cancel {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            color: white;
+        }
+
+        .btn-cancel:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(107, 114, 128, 0.3);
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-reset:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Password Table */
+        .password-table {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 80px;
+            gap: 1px;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 80px;
+            gap: 1px;
+            padding: 16px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.3s ease;
+            align-items: center;
+        }
+
+        .table-row:hover { 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(2px);
+        }
+        .table-row:last-child { border-bottom: none; }
+
+        .cell {
+            font-size: 14px;
+            color: #374151;
+            word-break: break-word;
+        }
+
+        .cell.entity { font-weight: 600; color: #1f2937; }
+        .cell.password { 
+            font-family: 'SF Mono', Monaco, monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .password-text { flex: 1; }
+        .toggle-pwd { 
+            background: none; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 16px; 
+            opacity: 0.6;
+            transition: all 0.2s ease;
+        }
+        .toggle-pwd:hover { 
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            padding: 6px;
+            border-radius: 4px;
+        }
+
+        .action-btn:hover { 
+            opacity: 1;
+            transform: translateY(-1px);
+        }
+        .copy-btn:hover { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .edit-btn:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        .delete-password-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+        /* Confirmation Modal */
+        .confirm-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-modal.active {
+            display: flex;
+        }
+
+        .confirm-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            animation: confirmAppear 0.3s ease;
+        }
+
+        @keyframes confirmAppear {
+            from { transform: scale(0.7); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .confirm-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .confirm-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .confirm-message {
+            color: #6b7280;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .confirm-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-btn.danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .confirm-btn.danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .confirm-btn.cancel {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .confirm-btn.cancel:hover {
+            background: #e5e7eb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-icon { 
+            font-size: 72px; 
+            margin-bottom: 20px; 
+            display: block;
+            opacity: 0.7;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            z-index: 1001;
+            opacity: 0;
+            transition: all 0.4s ease;
+            max-width: 350px;
+            text-align: center;
+            font-weight: 500;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .notification.show { 
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
+        }
+        .notification.error { 
+            background: #ef4444;
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes bounceIn {
             0% { transform: scale(0.3); opacity: 0; }
             50% { transform: scale(1.05); }
             70% { transform: scale(0.9); }
@@ -663,6 +1790,7 @@ function renderPasswords() {
             // Switch to credentials tab
             setTimeout(() => switchTab('passwords'), 1000);
         };
+
         function toggleDropdown() {
             const dropdown = document.getElementById('dropdownMenu');
             dropdown.classList.toggle('active');
@@ -1037,6 +2165,45 @@ function renderPasswords() {
             displayElement.classList.add('filled');
             
             const container = displayElement.closest('.selection-display');
+            container.querySelector('.selection-controls').style.display = 'flex';
+            
+            const allFilled = selections.entity && selections.username && selections.password;
+            document.getElementById('saveBtn').disabled = !allFilled;
+            
+            if (allFilled) {
+                showNotification('🎉 All fields filled! Ready to save credential.');
+            }
+        }
+
+        function clearSelection(field) {
+            const text = selections[field];
+            const originalIndex = selections[field + '_originalIndex'] || -1;
+            
+            if (text) {
+                if (originalIndex >= 0 && originalIndex < currentPhoto.originalOrder.length) {
+                    let insertIndex = 0;
+                    for (let i = 0; i < extractedTextItems.length; i++) {
+                        const itemOriginalIndex = currentPhoto.originalOrder.indexOf(extractedTextItems[i]);
+                        if (itemOriginalIndex > originalIndex) {
+                            insertIndex = i;
+                            break;
+                        }
+                        insertIndex = i + 1;
+                    }
+                    extractedTextItems.splice(insertIndex, 0, text);
+                } else {
+                    extractedTextItems.push(text);
+                }
+            }
+            
+            selections[field] = '';
+            selections[field + '_originalIndex'] = -1;
+            
+            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
+            displayElement.textContent = 'Drop text here';
+            displayElement.classList.remove('filled');
+            
+            const container = displayElement.closest('.selection-display');
             container.querySelector('.selection-controls').style.display = 'none';
             
             populateTextList();
@@ -1073,7 +2240,6 @@ function renderPasswords() {
             const text = input.value.trim();
             
             if (text && !extractedTextItems.includes(text)) {
-                // Add to the beginning of the array (top of list)
                 extractedTextItems.unshift(text);
                 populateTextList();
                 input.value = '';
@@ -1125,37 +2291,97 @@ function renderPasswords() {
 
         function renderPasswords() {
             const passwordRows = document.getElementById('passwordRows');
+            if (!passwordRows) return;
+            
             passwordRows.innerHTML = '';
             
-            passwords.forEach(pwd => {
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            const passwordsToShow = searchTerm !== '' ? filteredPasswords : passwords;
+            
+            passwordsToShow.forEach(pwd => {
                 const row = document.createElement('div');
                 row.className = 'table-row bounce-in';
-                row.innerHTML = `
-                    <div class="cell entity">
-                        <span id="entity-${pwd.id}">${pwd.entity}</span>
-                        <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                    </div>
-                    <div class="cell">
-                        <span id="username-${pwd.id}">${pwd.username}</span>
-                        <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                    </div>
-                    <div class="cell password">
-                        <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
-                        <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                        <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
-                    </div>
-                    <div class="cell actions">
-                        <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
-                        <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
-                        <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
-                        <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
-                        <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
-                    </div>
+                
+                const entityCell = document.createElement('div');
+                entityCell.className = 'cell entity';
+                entityCell.innerHTML = `
+                    <span id="entity-${pwd.id}">${pwd.entity}</span>
+                    <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
                 `;
+                
+                const usernameCell = document.createElement('div');
+                usernameCell.className = 'cell';
+                usernameCell.innerHTML = `
+                    <span id="username-${pwd.id}">${pwd.username}</span>
+                    <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                `;
+                
+                const passwordCell = document.createElement('div');
+                passwordCell.className = 'cell password';
+                passwordCell.innerHTML = `
+                    <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                    <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                `;
+                
+                const actionsCell = document.createElement('div');
+                actionsCell.className = 'cell actions';
+                actionsCell.innerHTML = `
+                    <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                    <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                    <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                    <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                    <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                `;
+                
+                row.appendChild(entityCell);
+                row.appendChild(usernameCell);
+                row.appendChild(passwordCell);
+                row.appendChild(actionsCell);
+                
                 passwordRows.appendChild(row);
             });
+            
             updateEmptyStates();
         }
+
+        // Search functionality - Define globally to ensure accessibility
+        window.searchCredentials = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                filteredPasswords = [];
+                clearBtn.classList.remove('show');
+            } else {
+                filteredPasswords = passwords.filter(pwd => 
+                    pwd.entity.toLowerCase().includes(searchTerm) ||
+                    pwd.username.toLowerCase().includes(searchTerm)
+                );
+                clearBtn.classList.add('show');
+            }
+            
+            renderPasswords();
+            updateEmptyStates();
+        };
+
+        window.clearSearch = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            searchInput.value = '';
+            clearBtn.classList.remove('show');
+            filteredPasswords = [];
+            renderPasswords();
+            updateEmptyStates();
+        };
 
         function togglePassword(passwordId) {
             const passwordDisplay = document.getElementById(`pwd-${passwordId}`);
@@ -1274,7 +2500,6 @@ function renderPasswords() {
             const hasResults = filteredPasswords.length > 0;
             const isSearching = searchTerm !== '';
             
-            // Show/hide different states
             document.getElementById('photoEmptyState').style.display = photos.length === 0 ? 'block' : 'none';
             
             document.getElementById('passwordEmptyState').style.display = 
@@ -1350,1253 +2575,6 @@ function renderPasswords() {
             renderPasswords();
             updateEmptyStates();
         });
-
-        // Ensure script closes properly
     </script>
 </body>
-</html>flex';
-            
-            const allFilled = selections.entity && selections.username && selections.password;
-            document.getElementById('saveBtn').disabled = !allFilled;
-            
-            if (allFilled) {
-                showNotification('🎉 All fields filled! Ready to save credential.');
-            }
-        }
-
-        function clearSelection(field) {
-            const text = selections[field];
-            const originalIndex = selections[field + '_originalIndex'] || -1;
-            
-            if (text) {
-                if (originalIndex >= 0 && originalIndex < currentPhoto.originalOrder.length) {
-                    let insertIndex = 0;
-                    for (let i = 0; i < extractedTextItems.length; i++) {
-                        const itemOriginalIndex = currentPhoto.originalOrder.indexOf(extractedTextItems[i]);
-                        if (itemOriginalIndex > originalIndex) {
-                            insertIndex = i;
-                            break;
-                        }
-                        insertIndex = i + 1;
-                    }
-                    extractedTextItems.splice(insertIndex, 0, text);
-                } else {
-                    extractedTextItems.push(text);
-                }
-            }
-            
-            selections[field] = '';
-            selections[field + '_originalIndex'] = -1;
-            
-            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
-            displayElement.textContent = 'Drop text here';
-            displayElement.classList.remove('filled');
-            
-            const container = displayElement.closest('.selection-display');
-            container.querySelector('.selection-controls').style.display = '<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- PWA Magic Code for Mobile App Experience -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="SecureVault Pro">
-    <meta name="theme-color" content="#4f46e5">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    
-    <!-- App Icons and Manifest -->
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/4f46e5/ffffff?text=🔐">
-    <link rel="icon" type="image/x-icon" href="https://via.placeholder.com/32x32/4f46e5/ffffff?text=🔐">
-    
-    <title>SecureVault Pro - AI Credential Manager</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-        }
-
-        /* Login Screen */
-        .login-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-            animation: loginAppear 0.5s ease;
-        }
-
-        @keyframes loginAppear {
-            from { opacity: 0; transform: translateY(-30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .login-header {
-            margin-bottom: 30px;
-        }
-
-        .login-header h1 {
-            font-size: 28px;
-            color: #1f2937;
-            margin-bottom: 8px;
-        }
-
-        .login-header p {
-            color: #6b7280;
-            font-size: 16px;
-        }
-
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .password-input-container {
-            position: relative;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 16px;
-            padding-right: 50px;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .login-input:focus {
-            outline: none;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-
-        .password-toggle {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 18px;
-            opacity: 0.6;
-            transition: opacity 0.2s ease;
-        }
-
-        .password-toggle:hover {
-            opacity: 1;
-        }
-
-        .login-btn {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            border: none;
-            padding: 16px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
-        }
-
-        .login-error {
-            color: #ef4444;
-            font-size: 14px;
-            margin-top: 10px;
-            display: none;
-            padding: 10px;
-            background: #fef2f2;
-            border-radius: 8px;
-            border: 1px solid #fecaca;
-        }
-
-        .reset-password-btn {
-            background: none !important;
-            border: none !important;
-            color: #6b7280 !important;
-            font-size: 14px !important;
-            margin-top: 16px !important;
-            cursor: pointer !important;
-            text-decoration: underline !important;
-        }
-
-        .reset-password-btn:hover {
-            color: #ef4444 !important;
-        }
-
-        /* Main App */
-        .app {
-            display: none;
-        }
-
-        .app.authenticated {
-            display: block;
-        }
-
-        .container {
-            max-width: 414px;
-            margin: 0 auto;
-            background: white;
-            min-height: 100vh;
-            box-shadow: 0 0 30px rgba(0,0,0,0.2);
-            position: relative;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            position: relative;
-        }
-
-        .header h1 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
-        .header p { opacity: 0.9; font-size: 14px; }
-
-        .menu-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .menu-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        .dropdown-menu {
-            position: absolute;
-            top: 50px;
-            right: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-            display: none;
-            z-index: 100;
-            min-width: 180px;
-        }
-
-        .dropdown-menu.active {
-            display: block;
-            animation: dropdownAppear 0.2s ease;
-        }
-
-        @keyframes dropdownAppear {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .dropdown-item {
-            display: block;
-            width: 100%;
-            padding: 12px 16px;
-            text-align: left;
-            border: none;
-            background: none;
-            color: #374151;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s ease;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .dropdown-item:hover {
-            background: #f8fafc;
-        }
-
-        .dropdown-item:last-child {
-            border-bottom: none;
-            color: #ef4444;
-        }
-
-        .dropdown-item:last-child:hover {
-            background: #fef2f2;
-        }
-
-        .tab-container {
-            display: flex;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .tab {
-            flex: 1;
-            padding: 16px;
-            text-align: center;
-            cursor: pointer;
-            font-weight: 500;
-            color: #64748b;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; background: white; }
-        .tab:hover { background: #f1f5f9; }
-        .tab-icon { font-size: 20px; margin-bottom: 4px; display: block; }
-
-        .content { padding: 20px; min-height: calc(100vh - 200px); }
-        .section { display: none; animation: fadeIn 0.3s ease; }
-        .section.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Upload Area */
-        .upload-area {
-            border: 2px dashed #cbd5e1;
-            border-radius: 16px;
-            padding: 40px 20px;
-            text-align: center;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f8fafc;
-            position: relative;
-        }
-
-        .upload-area:hover, .upload-area.dragover { 
-            border-color: #4f46e5; 
-            background: #f0f4ff;
-            transform: translateY(-2px);
-        }
-        .upload-area.processing { border-color: #f59e0b; background: #fef3c7; }
-        
-        .upload-icon { font-size: 48px; color: #94a3b8; margin-bottom: 16px; display: block; }
-        .upload-text { color: #64748b; font-size: 16px; margin-bottom: 8px; }
-        .upload-subtext { color: #94a3b8; font-size: 14px; }
-
-        .processing-indicator {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            background: #f59e0b;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            display: none;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .processing-indicator.show { display: block; }
-
-        /* Progress Bar */
-        .progress-container {
-            margin-top: 16px;
-            display: none;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #e2e8f0;
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4f46e5, #7c3aed);
-            border-radius: 3px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-
-        .progress-text {
-            text-align: center;
-            font-size: 14px;
-            color: #64748b;
-            margin-top: 8px;
-        }
-
-        /* Photo Grid */
-        .photo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .photo-item {
-            position: relative;
-            aspect-ratio: 1;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .photo-item:hover { 
-            transform: scale(1.05) rotate(1deg);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
-
-        .photo-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.8));
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            padding: 10px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .photo-item:hover .photo-overlay { opacity: 1; }
-
-        .photo-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        
-        .extract-status { 
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #10b981; 
-            color: white; 
-            border-radius: 4px; 
-            padding: 2px 6px; 
-            font-size: 10px; 
-            font-weight: 500;
-            animation: statusFadeOut 1s ease 1s forwards;
-        }
-        .extract-status.processing { 
-            background: #f59e0b; 
-            animation: none;
-        }
-        .extract-status.ready { 
-            background: #3b82f6;
-        }
-
-        @keyframes statusFadeOut {
-            0% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-        
-        .map-btn, .delete-btn { 
-            border: none; 
-            border-radius: 6px; 
-            padding: 6px 12px; 
-            font-size: 12px; 
-            cursor: pointer; 
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        .map-btn { background: #3b82f6; color: white; }
-        .map-btn:hover { background: #2563eb; transform: translateY(-1px); }
-        .delete-btn { background: #ef4444; color: white; }
-        .delete-btn:hover { background: #dc2626; transform: translateY(-1px); }
-
-        /* Photo Modal */
-        .photo-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.95);
-            z-index: 1200;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .photo-modal.active {
-            display: flex;
-        }
-
-        .photo-modal-content {
-            max-width: 90%;
-            max-height: 90%;
-            position: relative;
-        }
-
-        .photo-modal img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-        }
-
-        .photo-modal-close {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .photo-modal-close:hover {
-            background: rgba(0,0,0,0.9);
-            transform: rotate(90deg);
-        }
-
-        /* Manual Entry Button */
-        .manual-entry-container {
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .manual-entry-btn {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border: none;
-            border-radius: 16px;
-            padding: 20px;
-            width: 100%;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .manual-entry-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-        }
-
-        .manual-entry-icon {
-            font-size: 32px;
-            display: block;
-            margin-bottom: 8px;
-        }
-
-        .manual-entry-text {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .manual-entry-subtext {
-            font-size: 14px;
-            opacity: 0.9;
-        }
-
-        .empty-manual-btn {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            margin-top: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .empty-manual-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
-        }
-        .search-container {
-            margin-bottom: 20px;
-            position: relative;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 12px 40px 12px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6b7280;
-            font-size: 16px;
-        }
-
-        .clear-search {
-            position: absolute;
-            right: 35px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #6b7280;
-            cursor: pointer;
-            font-size: 16px;
-            display: none;
-        }
-
-        .clear-search.show {
-            display: block;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-
-        .modal.active { 
-            display: block; 
-            animation: modalAppear 0.3s ease;
-        }
-
-        @keyframes modalAppear {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .modal-content {
-            max-width: 95%;
-            margin: 20px auto;
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            position: relative;
-            animation: contentSlide 0.4s ease;
-        }
-
-        @keyframes contentSlide {
-            from { transform: translateY(-30px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .modal-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .close-modal { 
-            position: absolute; 
-            top: 15px; 
-            right: 15px; 
-            background: rgba(0,0,0,0.3); 
-            color: white; 
-            border: none; 
-            border-radius: 50%; 
-            width: 30px; 
-            height: 30px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            transition: all 0.3s ease;
-        }
-
-        .close-modal:hover {
-            background: rgba(0,0,0,0.5);
-            transform: rotate(90deg);
-        }
-
-        /* Selection Display with Edit Options */
-        .selection-progress {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .current-selections {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
-        }
-
-        .selection-display {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            font-size: 14px;
-            position: relative;
-            min-height: 100px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .selection-display:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .selection-display.entity { border-color: #ef4444; }
-        .selection-display.username { border-color: #10b981; }
-        .selection-display.password { border-color: #f59e0b; }
-
-        .selection-display.drag-over {
-            border-style: dashed;
-            transform: scale(1.05);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-        }
-
-        .selection-display.entity.drag-over { background: rgba(239, 68, 68, 0.1); }
-        .selection-display.username.drag-over { background: rgba(16, 185, 129, 0.1); }
-        .selection-display.password.drag-over { background: rgba(245, 158, 11, 0.1); }
-
-        .selection-label {
-            font-weight: 600;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            font-size: 16px;
-        }
-
-        .selection-value {
-            color: #64748b;
-            word-break: break-word;
-            min-height: 20px;
-            font-size: 14px;
-            margin-bottom: 12px;
-            line-height: 1.4;
-        }
-
-        .selection-value.filled {
-            color: #374151;
-            font-weight: 500;
-            background: #f8fafc;
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .selection-value.filled:hover {
-            background: #f1f5f9;
-        }
-
-        .selection-edit-input {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #3b82f6;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #374151;
-            background: white;
-        }
-
-        .selection-edit-input:focus {
-            outline: none;
-            border-color: #1d4ed8;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .selection-controls {
-            display: flex;
-            gap: 6px;
-            justify-content: center;
-        }
-
-        .selection-edit-btn, .selection-clear-btn {
-            padding: 4px 8px;
-            border: none;
-            border-radius: 6px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-weight: 500;
-        }
-
-        .selection-edit-btn {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .selection-edit-btn:hover {
-            background: #2563eb;
-            transform: translateY(-1px);
-        }
-
-        .selection-clear-btn {
-            background: #ef4444;
-            color: white;
-        }
-
-        .selection-clear-btn:hover {
-            background: #dc2626;
-            transform: translateY(-1px);
-        }
-
-        /* OCR Text List with Drag Support */
-        .ocr-section {
-            margin-top: 20px;
-        }
-
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #374151;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .instruction-text {
-            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
-            border: 1px solid #3b82f6;
-            border-radius: 10px;
-            padding: 16px;
-            font-size: 14px;
-            color: #1e40af;
-            margin-bottom: 16px;
-            line-height: 1.5;
-        }
-
-        .manual-input-section {
-            margin-bottom: 16px;
-            padding: 16px;
-            background: #f8fafc;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .manual-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .manual-input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .add-text-btn {
-            margin-top: 8px;
-            padding: 10px 16px;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .add-text-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-
-        .text-list {
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            background: white;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .text-item {
-            padding: 14px 16px;
-            border-bottom: 1px solid #f1f5f9;
-            cursor: grab;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            position: relative;
-            user-select: none;
-            background: white;
-        }
-
-        .text-item:last-child { border-bottom: none; }
-
-        .text-item:hover {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            transform: translateX(4px);
-        }
-
-        .text-item:active {
-            cursor: grabbing;
-        }
-
-        .text-item.dragging {
-            opacity: 0.6;
-            transform: rotate(3deg) scale(0.95);
-            z-index: 1000;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        }
-
-        .text-item-index {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #e5e7eb;
-            color: #6b7280;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-weight: 500;
-        }
-
-        /* Action Buttons */
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
-        }
-
-        .btn-save {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-        }
-
-        .btn-save:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
-        }
-        .btn-save:disabled { 
-            background: #d1d5db; 
-            cursor: not-allowed; 
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-cancel {
-            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
-            color: white;
-        }
-
-        .btn-cancel:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(107, 114, 128, 0.3);
-        }
-
-        .btn-reset {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-        }
-
-        .btn-reset:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
-        }
-
-        /* Password Table */
-        .password-table {
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
-        }
-
-        .table-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 80px;
-            gap: 1px;
-            padding: 16px;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .table-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 80px;
-            gap: 1px;
-            padding: 16px;
-            border-bottom: 1px solid #f1f5f9;
-            transition: all 0.3s ease;
-            align-items: center;
-        }
-
-        .table-row:hover { 
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            transform: translateX(2px);
-        }
-        .table-row:last-child { border-bottom: none; }
-
-        .cell {
-            font-size: 14px;
-            color: #374151;
-            word-break: break-word;
-        }
-
-        .cell.entity { font-weight: 600; color: #1f2937; }
-        .cell.password { 
-            font-family: 'SF Mono', Monaco, monospace;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .password-text { flex: 1; }
-        .toggle-pwd { 
-            background: none; 
-            border: none; 
-            cursor: pointer; 
-            font-size: 16px; 
-            opacity: 0.6;
-            transition: all 0.2s ease;
-        }
-        .toggle-pwd:hover { 
-            opacity: 1;
-            transform: scale(1.1);
-        }
-
-        .actions {
-            display: flex;
-            gap: 4px;
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            opacity: 0.6;
-            transition: all 0.2s ease;
-            padding: 6px;
-            border-radius: 4px;
-        }
-
-        .action-btn:hover { 
-            opacity: 1;
-            transform: translateY(-1px);
-        }
-        .copy-btn:hover { color: #10b981; background: rgba(16, 185, 129, 0.1); }
-        .edit-btn:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
-        .delete-password-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-
-        /* Confirmation Modal */
-        .confirm-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1500;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .confirm-modal.active {
-            display: flex;
-        }
-
-        .confirm-content {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            animation: confirmAppear 0.3s ease;
-        }
-
-        @keyframes confirmAppear {
-            from { transform: scale(0.7); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .confirm-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-
-        .confirm-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 8px;
-        }
-
-        .confirm-message {
-            color: #6b7280;
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .confirm-actions {
-            display: flex;
-            gap: 12px;
-        }
-
-        .confirm-btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .confirm-btn.danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .confirm-btn.danger:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-        }
-
-        .confirm-btn.cancel {
-            background: #f3f4f6;
-            color: #374151;
-        }
-
-        .confirm-btn.cancel:hover {
-            background: #e5e7eb;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #94a3b8;
-        }
-
-        .empty-icon { 
-            font-size: 72px; 
-            margin-bottom: 20px; 
-            display: block;
-            opacity: 0.7;
-        }
-
-        .empty-state h3 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #6b7280;
-        }
-
-        .empty-state p {
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        /* Notification */
-        .notification {
-            position: fixed;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #10b981;
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            z-index: 1001;
-            opacity: 0;
-            transition: all 0.4s ease;
-            max-width: 350px;
-            text-align: center;
-            font-weight: 500;
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-        }
-
-        .notification.show { 
-            opacity: 1;
-            transform: translateX(-50%) translateY(10px);
-        }
-        .notification.error { 
-            background: #ef4444;
-            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
-        }
-
-        @keyframes bounceIn {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.05); }
-            70% { transform: scale(0
+</html>
