@@ -1,4 +1,1399 @@
-<!DOCTYPE html>
+        function renderPasswords() {
+            const passwordRows = document.getElementById('passwordRows');
+            if (!passwordRows) return;
+            
+            passwordRows.innerHTML = '';
+            
+            // Use filtered passwords if search is active
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            const passwordsToShow = searchTerm !== '' ? filteredPasswords : passwords;
+            
+            passwordsToShow.forEach(pwd => {
+                const row = document.createElement('div');
+                row.className = 'table-row bounce-in';
+                
+                // Create the row HTML properly
+                const entityCell = document.createElement('div');
+                entityCell.className = 'cell entity';
+                entityCell.innerHTML = `
+                    <span id="entity-${pwd.id}">${pwd.entity}</span>
+                    <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                `;
+                
+                const usernameCell = document.createElement('div');
+                usernameCell.className = 'cell';
+                usernameCell.innerHTML = `
+                    <span id="username-${pwd.id}">${pwd.username}</span>
+                    <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                `;
+                
+                const passwordCell = document.createElement('div');
+                passwordCell.className = 'cell password';
+                passwordCell.innerHTML = `
+                    <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                    <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                `;
+                
+                const actionsCell = document.createElement('div');
+                actionsCell.className = 'cell actions';
+                actionsCell.innerHTML = `
+                    <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                    <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                    <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                    <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                    <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                `;
+                
+                row.appendChild(entityCell);
+                row.appendChild(usernameCell);
+                row.appendChild(passwordCell);
+                row.appendChild(actionsCell);
+                
+                passwordRows.appendChild(row);
+            });
+            
+            updateEmptyStates();
+        }
+
+        // Search functionality - Define globally to ensure accessibility
+        window.searchCredentials = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                filteredPasswords = [];
+                clearBtn.classList.remove('show');
+            } else {
+                filteredPasswords = passwords.filter(pwd => 
+                    pwd.entity.toLowerCase().includes(searchTerm) ||
+                    pwd.username.toLowerCase().includes(searchTerm)
+                );
+                clearBtn.classList.add('show');
+            }
+            
+            renderPasswords();
+            updateEmptyStates();
+        };
+
+        window.clearSearch = function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            
+            if (!searchInput || !clearBtn) return;
+            
+            searchInput.value = '';
+            clearBtn.classList.remove('show');
+            filteredPasswords = [];
+            renderPasswords();
+            updateEmptyStates();
+        };        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .bounce-in { animation: bounceIn 0.6s ease; }
+
+        @media (max-width: 414px) {
+            .container { box-shadow: none; }
+            .photo-grid { grid-template-columns: repeat(2, 1fr); }
+            .table-header, .table-row { 
+                padding: 12px; 
+                font-size: 13px; 
+                grid-template-columns: 1fr 1fr 1fr 70px; 
+            }
+            .modal-content { margin: 10px; }
+            .current-selections { grid-template-columns: 1fr; }
+            .login-container { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <!-- Create Password Screen -->
+            <div id="createPasswordScreen">
+                <div class="login-header">
+                    <h1>🔐 SecureVault Pro</h1>
+                    <p>Create your master password to secure your vault</p>
+                </div>
+                <div class="login-form">
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="newMasterPassword" placeholder="Create Master Password (min 6 chars)" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
+                    </div>
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="confirmMasterPassword" placeholder="Confirm Master Password" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
+                    </div>
+                    <button type="button" class="login-btn" onclick="handleCreatePassword()">🔐 Create Vault</button>
+                    <div class="login-error" id="createPasswordError">Passwords don't match. Please try again.</div>
+                </div>
+            </div>
+
+            <!-- Login Screen -->
+            <div id="loginPasswordScreen" style="display: none;">
+                <div class="login-header">
+                    <h1>🔐 SecureVault Pro</h1>
+                    <p>Enter your master password to access your vault</p>
+                </div>
+                <div class="login-form">
+                    <div class="password-input-container">
+                        <input type="password" class="login-input" id="masterPassword" placeholder="Master Password" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
+                    </div>
+                    <button type="button" class="login-btn" onclick="handleLogin()">🚀 Access Vault</button>
+                    <div class="login-error" id="loginError">Invalid password. Please try again.</div>
+                    <button type="button" class="reset-password-btn" onclick="resetMasterPassword()">Reset Master Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app" id="mainApp">
+        <div class="container">
+            <div class="header">
+                <button class="menu-btn" onclick="toggleDropdown()">⋮</button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <button class="dropdown-item" onclick="changePassword()">🔑 Change Password</button>
+                    <button class="dropdown-item" onclick="logout()">🚪 Logout</button>
+                </div>
+                <h1>🔐 SecureVault Pro</h1>
+                <p>Professional credential management with AI extraction</p>
+            </div>
+
+            <div class="tab-container">
+                <div class="tab active" data-tab="photos">
+                    <span class="tab-icon">📸</span>
+                    Photos
+                </div>
+                <div class="tab" data-tab="passwords">
+                    <span class="tab-icon">🔑</span>
+                    Credentials
+                </div>
+            </div>
+
+            <div class="content">
+                <!-- Photos Section -->
+                <div class="section active" id="photos">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="processing-indicator" id="processingIndicator">🔍 Processing OCR...</div>
+                        <span class="upload-icon">🔍</span>
+                        <div class="upload-text">Upload credential screenshots</div>
+                        <div class="upload-subtext">AI-powered OCR will extract all text for easy mapping</div>
+                        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+                        <div class="progress-container" id="progressContainer">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="progress-text" id="progressText">Processing...</div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Entry Button -->
+                    <div class="manual-entry-container">
+                        <button class="manual-entry-btn" onclick="openManualEntryModal()">
+                            <span class="manual-entry-icon">✍️</span>
+                            <div class="manual-entry-text">Manual Entry</div>
+                            <div class="manual-entry-subtext">Add credentials manually without photo</div>
+                        </button>
+                    </div>
+                    
+                    <div class="photo-grid" id="photoGrid"></div>
+                    
+                    <div class="empty-state" id="photoEmptyState">
+                        <span class="empty-icon">📸</span>
+                        <h3>No Images Uploaded</h3>
+                        <p>Upload screenshots containing login credentials.<br>Our AI will extract all text automatically.</p>
+                        <button class="empty-manual-btn" onclick="openManualEntryModal()">
+                            ✍️ Or add credentials manually
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Passwords Section -->
+                <div class="section" id="passwords">
+                    <div class="search-container">
+                        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search credentials by entity name..." oninput="searchCredentials()">
+                        <button class="clear-search" id="clearSearch" onclick="clearSearch()">✕</button>
+                        <span class="search-icon">🔍</span>
+                    </div>
+
+                    <div class="password-table" id="passwordTable">
+                        <div class="table-header">
+                            <div>Entity</div>
+                            <div>Username/ID</div>
+                            <div>Password</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="passwordRows"></div>
+                    </div>
+
+                    <div class="empty-state" id="passwordEmptyState">
+                        <span class="empty-icon">🔑</span>
+                        <h3>No Credentials Stored</h3>
+                        <p>Upload images and map credentials to start building<br>your secure digital vault.</p>
+                    </div>
+
+                    <div class="empty-state" id="noSearchResults" style="display: none;">
+                        <span class="empty-icon">🔍</span>
+                        <h3>No Results Found</h3>
+                        <p>No credentials match your search criteria.<br>Try a different search term.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Entry Modal -->
+    <div class="modal" id="manualEntryModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeManualEntryModal()">✕</button>
+            <div class="modal-header">
+                <h2>✍️ Manual Credential Entry</h2>
+                <p>Enter credential details manually</p>
+            </div>
+            <div class="modal-body">
+                <!-- Manual Entry Form -->
+                <div class="selection-progress">
+                    <div class="current-selections">
+                        <div class="selection-display entity">
+                            <div class="selection-label">🏢 Entity</div>
+                            <input type="text" class="manual-field-input" id="manualEntity" placeholder="Enter service/website name">
+                        </div>
+                        <div class="selection-display username">
+                            <div class="selection-label">👤 Username/ID</div>
+                            <input type="text" class="manual-field-input" id="manualUsername" placeholder="Enter username or email">
+                        </div>
+                        <div class="selection-display password">
+                            <div class="selection-label">🔑 Password</div>
+                            <div style="position: relative;">
+                                <input type="password" class="manual-field-input" id="manualPassword" placeholder="Enter password">
+                                <button type="button" class="manual-password-toggle" onclick="toggleManualPassword()">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="instruction-text">
+                    <strong>📝 Instructions:</strong> Fill in all three fields above. Entity is the service name (e.g., Gmail, Facebook), Username is your login ID or email, and Password is your secret password.
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="modal-actions">
+                    <button class="btn btn-cancel" onclick="closeManualEntryModal()">❌ Cancel</button>
+                    <button class="btn btn-save" id="manualSaveBtn" onclick="saveManualCredential()">💾 Save Credential</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div class="photo-modal" id="photoModal">
+        <button class="photo-modal-close" onclick="closePhotoModal()">✕</button>
+        <div class="photo-modal-content">
+            <img id="photoModalImage" src="" alt="Full size photo">
+        </div>
+    </div>
+
+    <!-- Mapping Modal -->
+    <div class="modal" id="mappingModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">✕</button>
+            <div class="modal-header">
+                <h2 id="modalTitle">🎯 Map Credentials from Image</h2>
+                <p>Drag text items to the appropriate fields below</p>
+            </div>
+            <div class="modal-body">
+                <!-- Selection Progress -->
+                <div class="selection-progress">
+                    <div class="current-selections">
+                        <div class="selection-display entity" data-field="entity">
+                            <div class="selection-label">🏢 Entity</div>
+                            <div class="selection-value" id="selectedEntity">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('entity')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('entity')">✕ Clear</button>
+                            </div>
+                        </div>
+                        <div class="selection-display username" data-field="username">
+                            <div class="selection-label">👤 Username/ID</div>
+                            <div class="selection-value" id="selectedUsername">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('username')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('username')">✕ Clear</button>
+                            </div>
+                        </div>
+                        <div class="selection-display password" data-field="password">
+                            <div class="selection-label">🔑 Password</div>
+                            <div class="selection-value" id="selectedPassword">Drop text here</div>
+                            <div class="selection-controls" style="display: none;">
+                                <button class="selection-edit-btn" onclick="editSelection('password')">✏️ Edit</button>
+                                <button class="selection-clear-btn" onclick="clearSelection('password')">✕ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OCR Text List -->
+                <div class="ocr-section">
+                    <div class="section-title">📝 Extracted Text</div>
+                    <div class="instruction-text">
+                        <strong>🎯 How to use:</strong> Drag text items from the list below to the Entity, Username, or Password boxes above. Items will be automatically removed from the list once assigned.
+                    </div>
+                    
+                    <!-- Manual Text Input -->
+                    <div class="manual-input-section">
+                        <input type="text" class="manual-input" id="manualTextInput" placeholder="Type text manually if OCR missed something...">
+                        <button class="add-text-btn" onclick="addManualText()">➕ Add to List</button>
+                    </div>
+                    
+                    <div class="text-list" id="textList">
+                        <!-- OCR extracted text items will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="modal-actions">
+                    <button class="btn btn-reset" onclick="resetSelection()">🔄 Reset All</button>
+                    <button class="btn btn-cancel" onclick="closeModal()">❌ Cancel</button>
+                    <button class="btn btn-save" id="saveBtn" onclick="saveCredential()" disabled>💾 Save Credential</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-content">
+            <div class="confirm-icon" id="confirmIcon">⚠️</div>
+            <div class="confirm-title" id="confirmTitle">Confirm Action</div>
+            <div class="confirm-message" id="confirmMessage">Are you sure you want to proceed?</div>
+            <div class="confirm-actions">
+                <button class="confirm-btn cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="confirm-btn danger" id="confirmActionBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // Global state
+        let photos = [];
+        let passwords = [];
+        let filteredPasswords = [];
+        let currentPhoto = null;
+        let extractedTextItems = [];
+        let selections = { entity: '', username: '', password: '' };
+        let pendingAction = null;
+        let isAuthenticated = false;
+        let masterPasswordHash = null;
+
+        // Simple hash function for password storage
+        function simpleHash(password) {
+            let hash = 0;
+            if (password.length === 0) return hash;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString();
+        }
+
+        // Check if master password exists on startup
+        function checkMasterPassword() {
+            try {
+                const stored = localStorage.getItem('secureVaultMasterPassword');
+                if (stored && stored.trim() !== '') {
+                    masterPasswordHash = stored;
+                    showLoginScreen();
+                } else {
+                    showCreatePasswordScreen();
+                }
+            } catch (error) {
+                console.error('Error checking master password:', error);
+                showCreatePasswordScreen();
+            }
+        }
+
+        function showCreatePasswordScreen() {
+            document.getElementById('createPasswordScreen').style.display = 'block';
+            document.getElementById('loginPasswordScreen').style.display = 'none';
+        }
+
+        function showLoginScreen() {
+            document.getElementById('createPasswordScreen').style.display = 'none';
+            document.getElementById('loginPasswordScreen').style.display = 'block';
+        }
+
+        // Create new master password
+        function handleCreatePassword() {
+            const password = document.getElementById('newMasterPassword').value;
+            const confirmPassword = document.getElementById('confirmMasterPassword').value;
+            const errorDiv = document.getElementById('createPasswordError');
+            
+            // Clear previous error
+            errorDiv.style.display = 'none';
+            
+            // Validation
+            if (!password || !confirmPassword) {
+                showError(errorDiv, 'Please fill in both password fields.');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError(errorDiv, 'Password must be at least 6 characters long.');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError(errorDiv, 'Passwords don\'t match. Please try again.');
+                return;
+            }
+            
+            try {
+                // Store hashed password
+                masterPasswordHash = simpleHash(password);
+                localStorage.setItem('secureVaultMasterPassword', masterPasswordHash);
+                
+                // Clear form fields
+                document.getElementById('newMasterPassword').value = '';
+                document.getElementById('confirmMasterPassword').value = '';
+                
+                // Switch to login screen
+                showLoginScreen();
+                showNotification('🎉 Master password created successfully! Please login.');
+                
+            } catch (error) {
+                console.error('Error creating password:', error);
+                showError(errorDiv, 'Failed to create password. Please try again.');
+            }
+        }
+
+        // Login with existing password
+        function handleLogin() {
+            const password = document.getElementById('masterPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            // Clear previous error
+            errorDiv.style.display = 'none';
+            
+            if (!password) {
+                showError(errorDiv, 'Please enter your password.');
+                return;
+            }
+            
+            try {
+                const hashedInput = simpleHash(password);
+                
+                if (hashedInput === masterPasswordHash) {
+                    // Successful login
+                    isAuthenticated = true;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('mainApp').classList.add('authenticated');
+                    document.getElementById('masterPassword').value = '';
+                    showNotification('🎉 Welcome to SecureVault Pro!');
+                } else {
+                    // Invalid password
+                    showError(errorDiv, 'Invalid password. Please try again.');
+                    document.getElementById('masterPassword').value = '';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(errorDiv, 'Login failed. Please try again.');
+            }
+        }
+
+        function showError(errorDiv, message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 4000);
+        }
+
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+
+        // Reset master password
+        function resetMasterPassword() {
+            const confirmed = confirm('⚠️ This will delete your master password and you will need to create a new one. Are you sure?');
+            if (confirmed) {
+                try {
+                    localStorage.removeItem('secureVaultMasterPassword');
+                    masterPasswordHash = null;
+                    
+                    // Clear form fields
+                    document.getElementById('masterPassword').value = '';
+                    document.getElementById('newMasterPassword').value = '';
+                    document.getElementById('confirmMasterPassword').value = '';
+                    
+                    showCreatePasswordScreen();
+                    showNotification('🔄 Master password reset. Create a new password.');
+                } catch (error) {
+                    console.error('Error resetting password:', error);
+                    showNotification('❌ Failed to reset password', 'error');
+                }
+            }
+        }
+
+        function logout() {
+            isAuthenticated = false;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').classList.remove('authenticated');
+            
+            // Clear password fields
+            document.getElementById('masterPassword').value = '';
+            
+            // Close dropdown
+            document.getElementById('dropdownMenu').classList.remove('active');
+            
+            // Check which screen to show
+            checkMasterPassword();
+            showNotification('👋 Logged out successfully');
+        }
+
+        // Manual entry functions
+        window.openManualEntryModal = function() {
+            document.getElementById('manualEntryModal').classList.add('active');
+            clearManualEntryForm();
+        };
+
+        window.closeManualEntryModal = function() {
+            document.getElementById('manualEntryModal').classList.remove('active');
+            clearManualEntryForm();
+        };
+
+        function clearManualEntryForm() {
+            document.getElementById('manualEntity').value = '';
+            document.getElementById('manualUsername').value = '';
+            document.getElementById('manualPassword').value = '';
+            document.getElementById('manualPassword').type = 'password';
+            document.querySelector('.manual-password-toggle').textContent = '👁️';
+        }
+
+        window.toggleManualPassword = function() {
+            const passwordInput = document.getElementById('manualPassword');
+            const toggleButton = document.querySelector('.manual-password-toggle');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️';
+            }
+        };
+
+        window.saveManualCredential = function() {
+            const entity = document.getElementById('manualEntity').value.trim();
+            const username = document.getElementById('manualUsername').value.trim();
+            const password = document.getElementById('manualPassword').value.trim();
+            
+            // Validation
+            if (!entity) {
+                showNotification('❌ Please enter an entity/service name!', 'error');
+                document.getElementById('manualEntity').focus();
+                return;
+            }
+            
+            if (!username) {
+                showNotification('❌ Please enter a username or email!', 'error');
+                document.getElementById('manualUsername').focus();
+                return;
+            }
+            
+            if (!password) {
+                showNotification('❌ Please enter a password!', 'error');
+                document.getElementById('manualPassword').focus();
+                return;
+            }
+            
+            // Check for duplicates
+            const isDuplicate = passwords.some(pwd => 
+                pwd.entity.toLowerCase() === entity.toLowerCase() && 
+                pwd.username.toLowerCase() === username.toLowerCase()
+            );
+            
+            if (isDuplicate) {
+                const confirmed = confirm(`A credential for "${entity}" with username "${username}" already exists. Do you want to create another one?`);
+                if (!confirmed) return;
+            }
+            
+            // Create credential
+            const credential = {
+                id: Date.now() + Math.random(),
+                entity: entity,
+                username: username,
+                password: password,
+                extractedFrom: 'Manual Entry',
+                extractedDate: new Date().toLocaleDateString()
+            };
+            
+            passwords.push(credential);
+            renderPasswords();
+            closeManualEntryModal();
+            
+            showNotification(`🎉 Credential "${entity}" created successfully!`);
+            
+            // Switch to credentials tab
+            setTimeout(() => switchTab('passwords'), 1000);
+        };
+        function toggleDropdown() {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdown.classList.toggle('active');
+        }
+
+        function changePassword() {
+            document.getElementById('dropdownMenu').classList.remove('active');
+            
+            const confirmed = confirm('🔑 Do you want to change your master password? You will need to create a new one.');
+            if (confirmed) {
+                localStorage.removeItem('secureVaultMasterPassword');
+                masterPasswordHash = null;
+                
+                // Clear form fields
+                document.getElementById('masterPassword').value = '';
+                document.getElementById('newMasterPassword').value = '';
+                document.getElementById('confirmMasterPassword').value = '';
+                
+                showCreatePasswordScreen();
+                showNotification('🔄 Create your new master password.');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('dropdownMenu');
+            const menuBtn = document.querySelector('.menu-btn');
+            
+            if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
+        });
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            updateEmptyStates();
+        }
+
+        // Photo upload setup
+        const uploadArea = document.getElementById('uploadArea');
+        const photoInput = document.getElementById('photoInput');
+
+        uploadArea.addEventListener('click', () => photoInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        photoInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    await processImage(file);
+                }
+            }
+        }
+
+        async function processImage(file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const photoData = {
+                    id: Date.now() + Math.random(),
+                    name: file.name,
+                    data: e.target.result,
+                    uploadDate: new Date().toLocaleDateString(),
+                    extractedText: [],
+                    originalOrder: [],
+                    status: 'processing'
+                };
+                
+                photos.push(photoData);
+                renderPhotos();
+                showNotification(`📸 ${file.name} uploaded, starting OCR...`);
+                
+                await extractTextWithOCR(photoData);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function extractTextWithOCR(photoData) {
+            try {
+                showProcessing(true);
+                updateProgress(10, 'Initializing OCR engine...');
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                updateProgress(40, 'Analyzing image content...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                updateProgress(70, 'Extracting text patterns...');
+                await new Promise(resolve => setTimeout(resolve, 800));
+                updateProgress(90, 'Processing results...');
+
+                const sampleText = await simulateOCRExtraction(photoData.name);
+                const cleanedText = cleanAndFilterText(sampleText);
+                
+                photoData.extractedText = [...cleanedText];
+                photoData.originalOrder = [...cleanedText];
+                photoData.status = 'ready';
+                
+                updateProgress(100, 'OCR completed successfully!');
+                
+                setTimeout(() => {
+                    showProcessing(false);
+                    renderPhotos();
+                    showNotification(`✅ OCR completed! Found ${cleanedText.length} text items.`);
+                }, 500);
+                
+            } catch (error) {
+                console.error('OCR error:', error);
+                photoData.status = 'error';
+                showProcessing(false);
+                renderPhotos();
+                showNotification('❌ OCR extraction failed', 'error');
+            }
+        }
+
+        async function simulateOCRExtraction(filename) {
+            const baseTexts = [
+                'Gmail Login', 'john.doe@gmail.com', 'MySecurePassword123',
+                'Facebook', 'user@facebook.com', 'facebookPass456',
+                'Instagram', 'insta_user', 'InstaSecure789',
+                'LinkedIn', 'professional@linkedin.com', 'LinkedPass2023',
+                'Twitter', 'tweet_master', 'TwitterSafe2023',
+                'GitHub', 'developer@github.com', 'GitSecure456',
+                'Microsoft Account', 'ms.user@outlook.com', 'MSPassword789'
+            ];
+
+            const uiTexts = [
+                'Sign In', 'Login', 'Password', 'Username', 'Email', 'Remember Me',
+                'Forgot Password?', 'Create Account', 'Submit', 'Cancel', 'Welcome Back'
+            ];
+
+            return [...baseTexts, ...uiTexts];
+        }
+
+        function cleanAndFilterText(textArray) {
+            const uiWords = ['sign in', 'login', 'password', 'username', 'email', 'remember me', 
+                           'forgot password', 'create account', 'submit', 'cancel', 'welcome back', 
+                           'sign up', 'register', 'continue'];
+            
+            return textArray
+                .filter(text => text && text.trim().length > 2)
+                .filter(text => !uiWords.includes(text.trim().toLowerCase()))
+                .map(text => text.trim())
+                .filter((text, index, array) => array.indexOf(text) === index)
+                .slice(0, 12);
+        }
+
+        function showProcessing(show) {
+            const indicator = document.getElementById('processingIndicator');
+            const uploadArea = document.getElementById('uploadArea');
+            const progressContainer = document.getElementById('progressContainer');
+            
+            if (show) {
+                indicator.classList.add('show');
+                uploadArea.classList.add('processing');
+                progressContainer.style.display = 'block';
+            } else {
+                indicator.classList.remove('show');
+                uploadArea.classList.remove('processing');
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        function updateProgress(percent, text = '') {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            progressFill.style.width = percent + '%';
+            if (text) progressText.textContent = text;
+        }
+
+        function renderPhotos() {
+            const photoGrid = document.getElementById('photoGrid');
+            photoGrid.innerHTML = '';
+            
+            photos.forEach(photo => {
+                const photoItem = document.createElement('div');
+                photoItem.className = 'photo-item bounce-in';
+                
+                let statusText = '📝 Ready to map';
+                let statusClass = 'ready';
+                let buttonText = 'Map';
+                let buttonDisabled = false;
+                let showStatus = false;
+                
+                if (photo.status === 'processing') {
+                    statusText = '⏳ Processing...';
+                    statusClass = 'processing';
+                    buttonText = 'Wait';
+                    buttonDisabled = true;
+                    showStatus = true;
+                } else if (photo.status === 'error') {
+                    statusText = '❌ OCR Failed';
+                    statusClass = 'error';
+                    buttonText = 'Retry';
+                    showStatus = true;
+                } else if (photo.extractedText && photo.extractedText.length === 0) {
+                    statusText = '⚠️ No text found';
+                    statusClass = 'error';
+                    showStatus = true;
+                }
+                
+                photoItem.innerHTML = `
+                    <img src="${photo.data}" alt="${photo.name}" onclick="openPhotoModal('${photo.id}')">
+                    ${showStatus ? `<div class="extract-status ${statusClass}">${statusText}</div>` : ''}
+                    <div class="photo-overlay">
+                        <div class="photo-actions">
+                            <button class="map-btn" onclick="openMappingModal('${photo.id}')" ${buttonDisabled ? 'disabled' : ''}>${buttonText}</button>
+                            <button class="delete-btn" onclick="confirmDeletePhoto('${photo.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+                photoGrid.appendChild(photoItem);
+            });
+            updateEmptyStates();
+        }
+
+        // Photo modal functions
+        function openPhotoModal(photoId) {
+            const photo = photos.find(p => p.id == photoId);
+            if (photo) {
+                document.getElementById('photoModalImage').src = photo.data;
+                document.getElementById('photoModal').classList.add('active');
+            }
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.remove('active');
+        }
+
+        function openMappingModal(photoId) {
+            currentPhoto = photos.find(p => p.id == photoId);
+            if (!currentPhoto || currentPhoto.status !== 'ready') {
+                showNotification('❌ Photo is not ready for mapping yet!', 'error');
+                return;
+            }
+
+            extractedTextItems = currentPhoto.extractedText ? [...currentPhoto.extractedText] : [];
+            resetSelectionState();
+            
+            document.getElementById('mappingModal').classList.add('active');
+            document.getElementById('modalTitle').textContent = `🎯 Map Credentials from "${currentPhoto.name}"`;
+            
+            populateTextList();
+        }
+
+        function resetSelectionState() {
+            selections = { entity: '', username: '', password: '' };
+            
+            document.getElementById('selectedEntity').textContent = 'Drop text here';
+            document.getElementById('selectedUsername').textContent = 'Drop text here';
+            document.getElementById('selectedPassword').textContent = 'Drop text here';
+            
+            document.querySelectorAll('.selection-controls').forEach(control => {
+                control.style.display = 'none';
+            });
+            
+            document.querySelectorAll('.selection-value').forEach(val => {
+                val.classList.remove('filled');
+            });
+            
+            document.getElementById('saveBtn').disabled = true;
+        }
+
+        function populateTextList() {
+            const textList = document.getElementById('textList');
+            textList.innerHTML = '';
+            
+            if (extractedTextItems.length === 0) {
+                textList.innerHTML = '<div class="text-item" style="text-align: center; color: #9ca3af; cursor: default;">No text available - try adding manually</div>';
+                return;
+            }
+            
+            extractedTextItems.forEach((text, index) => {
+                const item = document.createElement('div');
+                item.className = 'text-item';
+                item.innerHTML = `
+                    ${text}
+                    <span class="text-item-index">${index + 1}</span>
+                `;
+                item.draggable = true;
+                item.dataset.index = index;
+                item.dataset.text = text;
+                item.dataset.originalIndex = currentPhoto.originalOrder.indexOf(text);
+                
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                
+                item.onclick = (e) => {
+                    if (!e.target.classList.contains('text-item-index')) {
+                        selectTextByClick(text, index);
+                    }
+                };
+                
+                textList.appendChild(item);
+            });
+            
+            setupDropZones();
+        }
+
+        function setupDropZones() {
+            const dropZones = document.querySelectorAll('.selection-display');
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('drop', handleDrop);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.text);
+            e.dataTransfer.setData('text/index', e.target.dataset.index);
+            e.dataTransfer.setData('text/originalIndex', e.target.dataset.originalIndex);
+            e.target.classList.add('dragging');
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.closest('.selection-display').classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            if (!e.target.closest('.selection-display').contains(e.relatedTarget)) {
+                e.target.closest('.selection-display').classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropZone = e.target.closest('.selection-display');
+            dropZone.classList.remove('drag-over');
+            
+            const text = e.dataTransfer.getData('text/plain');
+            const index = parseInt(e.dataTransfer.getData('text/index'));
+            const originalIndex = parseInt(e.dataTransfer.getData('text/originalIndex'));
+            const field = dropZone.dataset.field;
+            
+            if (text && field) {
+                setSelectionValue(field, text, originalIndex);
+                removeTextFromList(index);
+                showNotification(`✅ "${text}" assigned to ${field}!`);
+            }
+        }
+
+        function removeTextFromList(index) {
+            extractedTextItems.splice(index, 1);
+            populateTextList();
+        }
+
+        function setSelectionValue(field, value, originalIndex = -1) {
+            selections[field] = value;
+            selections[field + '_originalIndex'] = originalIndex;
+            
+            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
+            displayElement.textContent = value;
+            displayElement.classList.add('filled');
+            
+            const container = displayElement.closest('.selection-display');
+            container.querySelector('.selection-controls').style.display = 'none';
+            
+            populateTextList();
+            
+            const allFilled = selections.entity && selections.username && selections.password;
+            document.getElementById('saveBtn').disabled = !allFilled;
+            
+            showNotification(`🔄 ${field} cleared and returned to original position`);
+        }
+
+        function editSelection(field) {
+            const currentValue = selections[field];
+            const newValue = prompt(`Edit ${field}:`, currentValue);
+            
+            if (newValue && newValue.trim() && newValue.trim() !== currentValue) {
+                setSelectionValue(field, newValue.trim(), -1);
+                showNotification(`✅ ${field} updated to "${newValue.trim()}"`);
+            }
+        }
+
+        function selectTextByClick(text, index) {
+            const field = prompt('Select field for "' + text + '":\n1. Entity\n2. Username\n3. Password\n\nType: entity, username, or password');
+            
+            if (field && ['entity', 'username', 'password'].includes(field.toLowerCase())) {
+                const originalIndex = currentPhoto.originalOrder.indexOf(text);
+                setSelectionValue(field.toLowerCase(), text, originalIndex);
+                removeTextFromList(index);
+                showNotification(`✅ "${text}" assigned to ${field}!`);
+            }
+        }
+
+        function addManualText() {
+            const input = document.getElementById('manualTextInput');
+            const text = input.value.trim();
+            
+            if (text && !extractedTextItems.includes(text)) {
+                // Add to the beginning of the array (top of list)
+                extractedTextItems.unshift(text);
+                populateTextList();
+                input.value = '';
+                showNotification(`✅ "${text}" added to top of list`);
+            } else if (extractedTextItems.includes(text)) {
+                showNotification('❌ Text already exists in list', 'error');
+            } else {
+                showNotification('❌ Please enter some text', 'error');
+            }
+        }
+
+        function resetSelection() {
+            ['entity', 'username', 'password'].forEach(field => {
+                if (selections[field]) {
+                    clearSelection(field);
+                }
+            });
+            showNotification('🔄 All selections reset');
+        }
+
+        function saveCredential() {
+            if (!selections.entity || !selections.username || !selections.password) {
+                showNotification('❌ Please fill all fields!', 'error');
+                return;
+            }
+
+            const credential = {
+                id: Date.now() + Math.random(),
+                entity: selections.entity,
+                username: selections.username,
+                password: selections.password,
+                extractedFrom: currentPhoto.name,
+                extractedDate: new Date().toLocaleDateString()
+            };
+
+            passwords.push(credential);
+            renderPasswords();
+            closeModal();
+            
+            showNotification(`🎉 Credential "${selections.entity}" saved successfully!`);
+            setTimeout(() => switchTab('passwords'), 1500);
+        }
+
+        function closeModal() {
+            document.getElementById('mappingModal').classList.remove('active');
+            document.getElementById('manualTextInput').value = '';
+            resetSelectionState();
+        }
+
+        function renderPasswords() {
+            const passwordRows = document.getElementById('passwordRows');
+            passwordRows.innerHTML = '';
+            
+            passwords.forEach(pwd => {
+                const row = document.createElement('div');
+                row.className = 'table-row bounce-in';
+                row.innerHTML = `
+                    <div class="cell entity">
+                        <span id="entity-${pwd.id}">${pwd.entity}</span>
+                        <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell">
+                        <span id="username-${pwd.id}">${pwd.username}</span>
+                        <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="cell password">
+                        <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                        <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                        <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                    </div>
+                    <div class="cell actions">
+                        <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                        <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                        <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                        <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                        <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                    </div>
+                `;
+                passwordRows.appendChild(row);
+            });
+            updateEmptyStates();
+        }
+
+        function togglePassword(passwordId) {
+            const passwordDisplay = document.getElementById(`pwd-${passwordId}`);
+            const password = passwords.find(p => p.id == passwordId);
+            passwordDisplay.textContent = passwordDisplay.textContent === '••••••••' ? password.password : '••••••••';
+        }
+
+        function copyPassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            navigator.clipboard.writeText(password.password).then(() => {
+                showNotification('📋 Password copied to clipboard!');
+            });
+        }
+
+        function editCredential(passwordId) {
+            document.getElementById(`entity-${passwordId}`).style.display = 'none';
+            document.getElementById(`username-${passwordId}`).style.display = 'none';
+            document.getElementById(`pwd-${passwordId}`).style.display = 'none';
+            document.getElementById(`toggle-${passwordId}`).style.display = 'none';
+            
+            document.getElementById(`edit-entity-${passwordId}`).style.display = 'block';
+            document.getElementById(`edit-username-${passwordId}`).style.display = 'block';
+            document.getElementById(`edit-password-${passwordId}`).style.display = 'block';
+            
+            document.getElementById(`copy-${passwordId}`).style.display = 'none';
+            document.getElementById(`edit-${passwordId}`).style.display = 'none';
+            document.getElementById(`save-${passwordId}`).style.display = 'inline-block';
+            document.getElementById(`cancel-${passwordId}`).style.display = 'inline-block';
+        }
+
+        function saveEdit(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            
+            const newEntity = document.getElementById(`edit-entity-${passwordId}`).value.trim();
+            const newUsername = document.getElementById(`edit-username-${passwordId}`).value.trim();
+            const newPassword = document.getElementById(`edit-password-${passwordId}`).value.trim();
+            
+            if (!newEntity || !newUsername || !newPassword) {
+                showNotification('❌ All fields are required!', 'error');
+                return;
+            }
+            
+            password.entity = newEntity;
+            password.username = newUsername;
+            password.password = newPassword;
+            
+            renderPasswords();
+            showNotification('✅ Credential updated successfully!');
+        }
+
+        function cancelEdit(passwordId) {
+            renderPasswords();
+            showNotification('❌ Edit cancelled');
+        }
+
+        function confirmDeletePhoto(photoId) {
+            showConfirmModal(
+                '🗑️',
+                'Delete Photo?',
+                'This will permanently delete the photo and its extracted text. This action cannot be undone.',
+                'Delete Photo',
+                () => deletePhoto(photoId)
+            );
+        }
+
+        function confirmDeletePassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            showConfirmModal(
+                '🗑️',
+                'Delete Credential?',
+                `This will permanently delete the credential for "${password.entity}". This action cannot be undone.`,
+                'Delete Credential',
+                () => deletePassword(passwordId)
+            );
+        }
+
+        function showConfirmModal(icon, title, message, actionText, actionCallback) {
+            document.getElementById('confirmIcon').textContent = icon;
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmActionBtn').textContent = actionText;
+            
+            pendingAction = actionCallback;
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+            pendingAction = null;
+        }
+
+        function confirmAction() {
+            if (pendingAction) {
+                pendingAction();
+                pendingAction = null;
+            }
+            closeConfirmModal();
+        }
+
+        function deletePhoto(photoId) {
+            const photo = photos.find(p => p.id == photoId);
+            photos = photos.filter(photo => photo.id != photoId);
+            renderPhotos();
+            showNotification(`🗑️ Photo "${photo.name}" deleted successfully`);
+        }
+
+        function deletePassword(passwordId) {
+            const password = passwords.find(p => p.id == passwordId);
+            passwords = passwords.filter(p => p.id != passwordId);
+            renderPasswords();
+            showNotification(`🗑️ Credential "${password.entity}" deleted successfully`);
+        }
+
+        function updateEmptyStates() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            const hasResults = filteredPasswords.length > 0;
+            const isSearching = searchTerm !== '';
+            
+            // Show/hide different states
+            document.getElementById('photoEmptyState').style.display = photos.length === 0 ? 'block' : 'none';
+            
+            document.getElementById('passwordEmptyState').style.display = 
+                passwords.length === 0 && !isSearching ? 'block' : 'none';
+            
+            document.getElementById('noSearchResults').style.display = 
+                isSearching && !hasResults ? 'block' : 'none';
+            
+            document.getElementById('passwordTable').style.display = 
+                (passwords.length === 0 && !isSearching) || (isSearching && !hasResults) ? 'none' : 'block';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 4000);
+        }
+
+        // Event listeners
+        document.getElementById('mappingModal').addEventListener('click', (e) => {
+            if (e.target.id === 'mappingModal') closeModal();
+        });
+
+        document.getElementById('confirmModal').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmModal') closeConfirmModal();
+        });
+
+        document.getElementById('photoModal').addEventListener('click', (e) => {
+            if (e.target.id === 'photoModal') closePhotoModal();
+        });
+
+        document.getElementById('manualEntryModal').addEventListener('click', (e) => {
+            if (e.target.id === 'manualEntryModal') closeManualEntryModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeConfirmModal();
+                closePhotoModal();
+                closeManualEntryModal();
+            }
+            if (e.key === 'Enter') {
+                if (document.getElementById('manualTextInput') === document.activeElement) {
+                    addManualText();
+                } else if (document.getElementById('masterPassword') === document.activeElement) {
+                    handleLogin();
+                } else if (document.getElementById('newMasterPassword') === document.activeElement || 
+                          document.getElementById('confirmMasterPassword') === document.activeElement) {
+                    handleCreatePassword();
+                } else if (document.getElementById('manualEntity') === document.activeElement ||
+                          document.getElementById('manualUsername') === document.activeElement ||
+                          document.getElementById('manualPassword') === document.activeElement) {
+                    saveManualCredential();
+                }
+            }
+        });
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize filtered passwords array
+            filteredPasswords = [];
+            
+            // Check if master password exists and show appropriate screen
+            checkMasterPassword();
+            
+            // Show login screen initially
+            document.getElementById('loginScreen').style.display = 'flex';
+            
+            // Initialize the app state
+            renderPhotos();
+            renderPasswords();
+            updateEmptyStates();
+        });
+
+        // Ensure script closes properly
+    </script>
+</body>
+</html>flex';
+            
+            const allFilled = selections.entity && selections.username && selections.password;
+            document.getElementById('saveBtn').disabled = !allFilled;
+            
+            if (allFilled) {
+                showNotification('🎉 All fields filled! Ready to save credential.');
+            }
+        }
+
+        function clearSelection(field) {
+            const text = selections[field];
+            const originalIndex = selections[field + '_originalIndex'] || -1;
+            
+            if (text) {
+                if (originalIndex >= 0 && originalIndex < currentPhoto.originalOrder.length) {
+                    let insertIndex = 0;
+                    for (let i = 0; i < extractedTextItems.length; i++) {
+                        const itemOriginalIndex = currentPhoto.originalOrder.indexOf(extractedTextItems[i]);
+                        if (itemOriginalIndex > originalIndex) {
+                            insertIndex = i;
+                            break;
+                        }
+                        insertIndex = i + 1;
+                    }
+                    extractedTextItems.splice(insertIndex, 0, text);
+                } else {
+                    extractedTextItems.push(text);
+                }
+            }
+            
+            selections[field] = '';
+            selections[field + '_originalIndex'] = -1;
+            
+            const displayElement = document.getElementById(`selected${field.charAt(0).toUpperCase() + field.slice(1)}`);
+            displayElement.textContent = 'Drop text here';
+            displayElement.classList.remove('filled');
+            
+            const container = displayElement.closest('.selection-display');
+            container.querySelector('.selection-controls').style.display = '<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -39,10 +1434,6 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
-        }
-
-        .login-screen.hidden {
-            display: none;
         }
 
         .login-container {
@@ -168,7 +1559,6 @@
 
         .app.authenticated {
             display: block;
-            min-height: 100vh;
         }
 
         .container {
@@ -560,8 +1950,6 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
         }
-
-        /* Search Bar */
         .search-container {
             margin-bottom: 20px;
             position: relative;
@@ -607,8 +1995,6 @@
         .clear-search.show {
             display: block;
         }
-
-        /* Modal Styling */
         .modal {
             display: none;
             position: fixed;
@@ -1068,7 +2454,7 @@
             opacity: 1;
             transform: translateY(-1px);
         }
-        .copy-btn:hover { color: #10b981; background: rgba(16, 185, 1290.1); }
+        .copy-btn:hover { color: #10b981; background: rgba(16, 185, 129, 0.1); }
         .edit-btn:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
         .delete-password-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
 
@@ -1213,911 +2599,4 @@
         @keyframes bounceIn {
             0% { transform: scale(0.3); opacity: 0; }
             50% { transform: scale(1.05); }
-            70% { transform: scale(0.9); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .bounce-in { animation: bounceIn 0.6s ease; }
-
-        @media (max-width: 414px) {
-            .container { box-shadow: none; }
-            .photo-grid { grid-template-columns: repeat(2, 1fr); }
-            .table-header, .table-row { 
-                padding: 12px; 
-                font-size: 13px; 
-                grid-template-columns: 1fr 1fr 1fr 70px; 
-            }
-            .modal-content { margin: 10px; }
-            .current-selections { grid-template-columns: 1fr; }
-            .login-container { padding: 30px 20px; }
-        }
-    </style>
-</head>
-<body>
-    <!-- Login Screen -->
-    <div class="login-screen" id="loginScreen">
-        <div class="login-container">
-            <!-- Create Password Screen -->
-            <div id="createPasswordScreen">
-                <div class="login-header">
-                    <h1>🔐 SecureVault Pro</h1>
-                    <p>Create your master password to secure your vault</p>
-                </div>
-                <div class="login-form">
-                    <div class="password-input-container">
-                        <input type="password" class="login-input" id="newMasterPassword" placeholder="Create Master Password (min 6 chars)" required>
-                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
-                    </div>
-                    <div class="password-input-container">
-                        <input type="password" class="login-input" id="confirmMasterPassword" placeholder="Confirm Master Password" required>
-                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
-                    </div>
-                    <button type="button" class="login-btn" onclick="handleCreatePassword()">🔐 Create Vault</button>
-                    <div class="login-error" id="createPasswordError">Passwords don't match. Please try again.</div>
-                </div>
-            </div>
-
-            <!-- Login Screen -->
-            <div id="loginPasswordScreen" style="display: none;">
-                <div class="login-header">
-                    <h1>🔐 SecureVault Pro</h1>
-                    <p>Enter your master password to access your vault</p>
-                </div>
-                <div class="login-form">
-                    <div class="password-input-container">
-                        <input type="password" class="login-input" id="masterPassword" placeholder="Master Password" required>
-                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
-                    </div>
-                    <button type="button" class="login-btn" onclick="handleLogin()">🚀 Access Vault</button>
-                    <div class="login-error" id="loginError">Invalid password. Please try again.</div>
-                    <button type="button" class="reset-password-btn" onclick="resetMasterPassword()">Reset Master Password</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main App -->
-    <div class="app" id="mainApp">
-        <div class="container">
-            <div class="header">
-                <button class="menu-btn" onclick="toggleDropdown()">⋮</button>
-                <div class="dropdown-menu" id="dropdownMenu">
-                    <button class="dropdown-item" onclick="changePassword()">🔑 Change Password</button>
-                    <button class="dropdown-item" onclick="logout()">🚪 Logout</button>
-                </div>
-                <h1>🔐 SecureVault Pro</h1>
-                <p>Professional credential management with AI extraction</p>
-            </div>
-
-            <div class="tab-container">
-                <div class="tab active" data-tab="photos">
-                    <span class="tab-icon">📸</span>
-                    Photos
-                </div>
-                <div class="tab" data-tab="passwords">
-                    <span class="tab-icon">🔑</span>
-                    Credentials
-                </div>
-            </div>
-
-            <div class="content">
-                <!-- Photos Section -->
-                <div class="section active" id="photos">
-                    <div class="upload-area" id="uploadArea">
-                        <div class="processing-indicator" id="processingIndicator">🔍 Processing OCR...</div>
-                        <span class="upload-icon">🔍</span>
-                        <div class="upload-text">Upload credential screenshots</div>
-                        <div class="upload-subtext">AI-powered OCR will extract all text for easy mapping</div>
-                        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
-                        <div class="progress-container" id="progressContainer">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
-                            <div class="progress-text" id="progressText">Processing...</div>
-                        </div>
-                    </div>
-
-                    <!-- Manual Entry Button -->
-                    <div class="manual-entry-container">
-                        <button class="manual-entry-btn" onclick="openManualEntryModal()">
-                            <span class="manual-entry-icon">✍️</span>
-                            <div class="manual-entry-text">Manual Entry</div>
-                            <div class="manual-entry-subtext">Add credentials manually without photo</div>
-                        </button>
-                    </div>
-                    
-                    <div class="photo-grid" id="photoGrid"></div>
-                    
-                    <div class="empty-state" id="photoEmptyState">
-                        <span class="empty-icon">📸</span>
-                        <h3>No Images Uploaded</h3>
-                        <p>Upload screenshots containing login credentials.<br>Our AI will extract all text automatically.</p>
-                        <button class="empty-manual-btn" onclick="openManualEntryModal()">
-                            ✍️ Or add credentials manually
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Passwords Section -->
-                <div class="section" id="passwords">
-                    <div class="search-container">
-                        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search credentials by entity name..." oninput="searchCredentials()">
-                        <button class="clear-search" id="clearSearch" onclick="clearSearch()">✕</button>
-                        <span class="search-icon">🔍</span>
-                    </div>
-
-                    <div class="password-table" id="passwordTable">
-                        <div class="table-header">
-                            <div>Entity</div>
-                            <div>Username/ID</div>
-                            <div>Password</div>
-                            <div>Actions</div>
-                        </div>
-                        <div id="passwordRows"></div>
-                    </div>
-
-                    <div class="empty-state" id="passwordEmptyState">
-                        <span class="empty-icon">🔑</span>
-                        <h3>No Credentials Stored</h3>
-                        <p>Upload images and map credentials to start building<br>your secure digital vault.</p>
-                    </div>
-
-                    <div class="empty-state" id="noSearchResults" style="display: none;">
-                        <span class="empty-icon">🔍</span>
-                        <h3>No Results Found</h3>
-                        <p>No credentials match your search criteria.<br>Try a different search term.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Manual Entry Modal -->
-    <div class="modal" id="manualEntryModal">
-        <div class="modal-content">
-            <button class="close-modal" onclick="closeManualEntryModal()">✕</button>
-            <div class="modal-header">
-                <h2>✍️ Manual Credential Entry</h2>
-                <p>Enter credential details manually</p>
-            </div>
-            <div class="modal-body">
-                <!-- Manual Entry Form -->
-                <div class="selection-progress">
-                    <div class="current-selections">
-                        <div class="selection-display entity">
-                            <div class="selection-label">🏢 Entity</div>
-                            <input type="text" class="manual-field-input" id="manualEntity" placeholder="Enter service/website name">
-                        </div>
-                        <div class="selection-display username">
-                            <div class="selection-label">👤 Username/ID</div>
-                            <input type="text" class="manual-field-input" id="manualUsername" placeholder="Enter username or email">
-                        </div>
-                        <div class="selection-display password">
-                            <div class="selection-label">🔑 Password</div>
-                            <div style="position: relative;">
-                                <input type="password" class="manual-field-input" id="manualPassword" placeholder="Enter password">
-                                <button type="button" class="manual-password-toggle" onclick="toggleManualPassword()">👁️</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Instructions -->
-                <div class="instruction-text">
-                    <strong>📝 Instructions:</strong> Fill in all three fields above. Entity is the service name (e.g., Gmail, Facebook), Username is your login ID or email, and Password is your secret password.
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="modal-actions">
-                    <button class="btn btn-cancel" onclick="closeManualEntryModal()">❌ Cancel</button>
-                    <button class="btn btn-save" id="manualSaveBtn" onclick="saveManualCredential()">💾 Save Credential</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Photo Modal -->
-    <div class="photo-modal" id="photoModal">
-        <button class="photo-modal-close" onclick="closePhotoModal()">✕</button>
-        <div class="photo-modal-content">
-            <img id="photoModalImage" src="" alt="Full size photo">
-        </div>
-    </div>
-
-    <!-- Mapping Modal -->
-    <div class="modal" id="mappingModal">
-        <div class="modal-content">
-            <button class="close-modal" onclick="closeModal()">✕</button>
-            <div class="modal-header">
-                <h2 id="modalTitle">🎯 Map Credentials from Image</h2>
-                <p>Drag text items to the appropriate fields below</p>
-            </div>
-            <div class="modal-body">
-                <!-- Selection Progress -->
-                <div class="selection-progress">
-                    <div class="current-selections">
-                        <div class="selection-display entity" data-field="entity">
-                            <div class="selection-label">🏢 Entity</div>
-                            <div class="selection-value" id="selectedEntity">Drop text here</div>
-                            <div class="selection-controls" style="display: none;">
-                                <button class="selection-edit-btn" onclick="editSelection('entity')">✏️ Edit</button>
-                                <button class="selection-clear-btn" onclick="clearSelection('entity')">✕ Clear</button>
-                            </div>
-                        </div>
-                        <div class="selection-display username" data-field="username">
-                            <div class="selection-label">👤 Username/ID</div>
-                            <div class="selection-value" id="selectedUsername">Drop text here</div>
-                            <div class="selection-controls" style="display: none;">
-                                <button class="selection-edit-btn" onclick="editSelection('username')">✏️ Edit</button>
-                                <button class="selection-clear-btn" onclick="clearSelection('username')">✕ Clear</button>
-                            </div>
-                        </div>
-                        <div class="selection-display password" data-field="password">
-                            <div class="selection-label">🔑 Password</div>
-                            <div class="selection-value" id="selectedPassword">Drop text here</div>
-                            <div class="selection-controls" style="display: none;">
-                                <button class="selection-edit-btn" onclick="editSelection('password')">✏️ Edit</button>
-                                <button class="selection-clear-btn" onclick="clearSelection('password')">✕ Clear</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- OCR Text List -->
-                <div class="ocr-section">
-                    <div class="section-title">📝 Extracted Text</div>
-                    <div class="instruction-text">
-                        <strong>🎯 How to use:</strong> Drag text items from the list below to the Entity, Username, or Password boxes above. Items will be automatically removed from the list once assigned.
-                    </div>
-                    
-                    <!-- Manual Text Input -->
-                    <div class="manual-input-section">
-                        <input type="text" class="manual-input" id="manualTextInput" placeholder="Type text manually if OCR missed something...">
-                        <button class="add-text-btn" onclick="addManualText()">➕ Add to List</button>
-                    </div>
-                    
-                    <div class="text-list" id="textList">
-                        <!-- OCR extracted text items will be populated here -->
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="modal-actions">
-                    <button class="btn btn-reset" onclick="resetSelection()">🔄 Reset All</button>
-                    <button class="btn btn-cancel" onclick="closeModal()">❌ Cancel</button>
-                    <button class="btn btn-save" id="saveBtn" onclick="saveCredential()" disabled>💾 Save Credential</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div class="confirm-modal" id="confirmModal">
-        <div class="confirm-content">
-            <div class="confirm-icon" id="confirmIcon">⚠️</div>
-            <div class="confirm-title" id="confirmTitle">Confirm Action</div>
-            <div class="confirm-message" id="confirmMessage">Are you sure you want to proceed?</div>
-            <div class="confirm-actions">
-                <button class="confirm-btn cancel" onclick="closeConfirmModal()">Cancel</button>
-                <button class="confirm-btn danger" id="confirmActionBtn" onclick="confirmAction()">Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Notification -->
-    <div class="notification" id="notification"></div>
-
-    <script>
-        // Global state
-        let photos = [];
-        let passwords = [];
-        let filteredPasswords = [];
-        let currentPhoto = null;
-        let extractedTextItems = [];
-        let selections = { entity: '', username: '', password: '' };
-        let pendingAction = null;
-        let isAuthenticated = false;
-        let masterPasswordHash = null;
-
-        // Simple hash function for password storage
-        function simpleHash(password) {
-            let hash = 0;
-            if (password.length === 0) return hash;
-            for (let i = 0; i < password.length; i++) {
-                const char = password.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
-            }
-            return Math.abs(hash).toString();
-        }
-
-        // Check if master password exists on startup
-        function checkMasterPassword() {
-            try {
-                const stored = localStorage.getItem('secureVaultMasterPassword');
-                if (stored && stored.trim() !== '') {
-                    masterPasswordHash = stored;
-                    showLoginScreen();
-                } else {
-                    showCreatePasswordScreen();
-                }
-            } catch (error) {
-                console.error('Error checking master password:', error);
-                showCreatePasswordScreen();
-            }
-        }
-
-        function showCreatePasswordScreen() {
-            document.getElementById('createPasswordScreen').style.display = 'block';
-            document.getElementById('loginPasswordScreen').style.display = 'none';
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('mainApp').classList.remove('authenticated');
-        }
-
-        function showLoginScreen() {
-            document.getElementById('createPasswordScreen').style.display = 'none';
-            document.getElementById('loginPasswordScreen').style.display = 'block';
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('mainApp').classList.remove('authenticated');
-        }
-
-        // Create new master password
-        function handleCreatePassword() {
-            const password = document.getElementById('newMasterPassword').value;
-            const confirmPassword = document.getElementById('confirmMasterPassword').value;
-            const errorDiv = document.getElementById('createPasswordError');
-            
-            // Clear previous error
-            errorDiv.style.display = 'none';
-            
-            // Validation
-            if (!password || !confirmPassword) {
-                showError(errorDiv, 'Please fill in both password fields.');
-                return;
-            }
-            
-            if (password.length < 6) {
-                showError(errorDiv, 'Password must be at least 6 characters long.');
-                return;
-            }
-            
-            if (password !== confirmPassword) {
-                showError(errorDiv, 'Passwords don\'t match. Please try again.');
-                return;
-            }
-            
-            try {
-                // Store hashed password
-                masterPasswordHash = simpleHash(password);
-                localStorage.setItem('secureVaultMasterPassword', masterPasswordHash);
-                
-                // Clear form fields
-                document.getElementById('newMasterPassword').value = '';
-                document.getElementById('confirmMasterPassword').value = '';
-                
-                // Switch to login screen
-                showLoginScreen();
-                showNotification('🎉 Master password created successfully! Please login.');
-                
-            } catch (error) {
-                console.error('Error creating password:', error);
-                showError(errorDiv, 'Failed to create password. Please try again.');
-            }
-        }
-
-        // Login with existing password
-        function handleLogin() {
-            const password = document.getElementById('masterPassword').value;
-            const errorDiv = document.getElementById('loginError');
-            
-            // Clear previous error
-            errorDiv.style.display = 'none';
-            
-            if (!password) {
-                showError(errorDiv, 'Please enter your password.');
-                return;
-            }
-            
-            try {
-                const hashedInput = simpleHash(password);
-                
-                if (hashedInput === masterPasswordHash) {
-                    // Successful login
-                    isAuthenticated = true;
-                    document.getElementById('loginScreen').classList.add('hidden');
-                    document.getElementById('mainApp').classList.add('authenticated');
-                    document.getElementById('masterPassword').value = '';
-                    showNotification('🎉 Welcome to SecureVault Pro!');
-                } else {
-                    // Invalid password
-                    showError(errorDiv, 'Invalid password. Please try again.');
-                    document.getElementById('masterPassword').value = '';
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showError(errorDiv, 'Login failed. Please try again.');
-            }
-        }
-
-        function showError(errorDiv, message) {
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 4000);
-        }
-
-        // Toggle password visibility
-        function togglePasswordVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            const button = input.nextElementSibling;
-            
-            if (input.type === 'password') {
-                input.type = 'text';
-                button.textContent = '🙈';
-            } else {
-                input.type = 'password';
-                button.textContent = '👁️';
-            }
-        }
-
-        // Reset master password
-        function resetMasterPassword() {
-            const confirmed = confirm('⚠️ This will delete your master password and you will need to create a new one. Are you sure?');
-            if (confirmed) {
-                try {
-                    localStorage.removeItem('secureVaultMasterPassword');
-                    masterPasswordHash = null;
-                    
-                    // Clear form fields
-                    document.getElementById('masterPassword').value = '';
-                    document.getElementById('newMasterPassword').value = '';
-                    document.getElementById('confirmMasterPassword').value = '';
-                    
-                    showCreatePasswordScreen();
-                    showNotification('🔄 Master password reset. Create a new password.');
-                } catch (error) {
-                    console.error('Error resetting password:', error);
-                    showNotification('❌ Failed to reset password', 'error');
-                }
-            }
-        }
-
-        function logout() {
-            isAuthenticated = false;
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('mainApp').classList.remove('authenticated');
-            
-            // Clear password fields
-            document.getElementById('masterPassword').value = '';
-            
-            // Close dropdown
-            document.getElementById('dropdownMenu').classList.remove('active');
-            
-            // Check which screen to show
-            checkMasterPassword();
-            showNotification('👋 Logged out successfully');
-        }
-
-        // Manual entry functions
-        window.openManualEntryModal = function() {
-            document.getElementById('manualEntryModal').classList.add('active');
-            clearManualEntryForm();
-        };
-
-        window.closeManualEntryModal = function() {
-            document.getElementById('manualEntryModal').classList.remove('active');
-            clearManualEntryForm();
-        };
-
-        function clearManualEntryForm() {
-            document.getElementById('manualEntity').value = '';
-            document.getElementById('manualUsername').value = '';
-            document.getElementById('manualPassword').value = '';
-            document.getElementById('manualPassword').type = 'password';
-            document.querySelector('.manual-password-toggle').textContent = '👁️';
-        }
-
-        window.toggleManualPassword = function() {
-            const passwordInput = document.getElementById('manualPassword');
-            const toggleButton = document.querySelector('.manual-password-toggle');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleButton.textContent = '🙈';
-            } else {
-                passwordInput.type = 'password';
-                toggleButton.textContent = '👁️';
-            }
-        };
-
-        window.saveManualCredential = function() {
-            const entity = document.getElementById('manualEntity').value.trim();
-            const username = document.getElementById('manualUsername').value.trim();
-            const password = document.getElementById('manualPassword').value.trim();
-            
-            // Validation
-            if (!entity) {
-                showNotification('❌ Please enter an entity/service name!', 'error');
-                document.getElementById('manualEntity').focus();
-                return;
-            }
-            
-            if (!username) {
-                showNotification('❌ Please enter a username or email!', 'error');
-                document.getElementById('manualUsername').focus();
-                return;
-            }
-            
-            if (!password) {
-                showNotification('❌ Please enter a password!', 'error');
-                document.getElementById('manualPassword').focus();
-                return;
-            }
-            
-            // Check for duplicates
-            const isDuplicate = passwords.some(pwd => 
-                pwd.entity.toLowerCase() === entity.toLowerCase() && 
-                pwd.username.toLowerCase() === username.toLowerCase()
-            );
-            
-            if (isDuplicate) {
-                const confirmed = confirm(`A credential for "${entity}" with username "${username}" already exists. Do you want to create another one?`);
-                if (!confirmed) return;
-            }
-            
-            // Create credential
-            const credential = {
-                id: Date.now() + Math.random(),
-                entity: entity,
-                username: username,
-                password: password,
-                extractedFrom: 'Manual Entry',
-                extractedDate: new Date().toLocaleDateString()
-            };
-            
-            passwords.push(credential);
-            renderPasswords();
-            closeManualEntryModal();
-            
-            showNotification(`🎉 Credential "${entity}" created successfully!`);
-            
-            // Switch to credentials tab
-            setTimeout(() => switchTab('passwords'), 1000);
-        };
-
-        function toggleDropdown() {
-            const dropdown = document.getElementById('dropdownMenu');
-            dropdown.classList.toggle('active');
-        }
-
-        function changePassword() {
-            document.getElementById('dropdownMenu').classList.remove('active');
-            
-            const confirmed = confirm('🔑 Do you want to change your master password? You will need to create a new one.');
-            if (confirmed) {
-                localStorage.removeItem('secureVaultMasterPassword');
-                masterPasswordHash = null;
-                
-                // Clear form fields
-                document.getElementById('masterPassword').value = '';
-                document.getElementById('newMasterPassword').value = '';
-                document.getElementById('confirmMasterPassword').value = '';
-                
-                showCreatePasswordScreen();
-                showNotification('🔄 Create your new master password.');
-            }
-        }
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const dropdown = document.getElementById('dropdownMenu');
-            const menuBtn = document.querySelector('.menu-btn');
-            
-            if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
-                dropdown.classList.remove('active');
-            }
-        });
-
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
-        });
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            updateEmptyStates();
-        }
-
-        // Photo upload setup
-        const uploadArea = document.getElementById('uploadArea');
-        const photoInput = document.getElementById('photoInput');
-
-        uploadArea.addEventListener('click', () => photoInput.click());
-        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
-        photoInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-        async function handleFiles(files) {
-            for (const file of files) {
-                if (file.type.startsWith('image/')) {
-                    await processImage(file);
-                }
-            }
-        }
-
-        async function processImage(file) {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const photoData = {
-                    id: Date.now() + Math.random(),
-                    name: file.name,
-                    data: e.target.result,
-                    uploadDate: new Date().toLocaleDateString(),
-                    extractedText: [],
-                    originalOrder: [],
-                    status: 'processing'
-                };
-                
-                photos.push(photoData);
-                renderPhotos();
-                showNotification(`📸 ${file.name} uploaded, starting OCR...`);
-                
-                await extractTextWithOCR(photoData);
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function extractTextWithOCR(photoData) {
-            try {
-                showProcessing(true);
-                updateProgress(10, 'Initializing OCR engine...');
-
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                updateProgress(40, 'Analyzing image content...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                updateProgress(70, 'Extracting text patterns...');
-                await new Promise(resolve => setTimeout(resolve, 800));
-                updateProgress(90, 'Processing results...');
-
-                const sampleText = await simulateOCRExtraction(photoData.name);
-                const cleanedText = cleanAndFilterText(sampleText);
-                
-                photoData.extractedText = [...cleanedText];
-                photoData.originalOrder = [...cleanedText];
-                photoData.status = 'ready';
-                
-                updateProgress(100, 'OCR completed successfully!');
-                
-                setTimeout(() => {
-                    showProcessing(false);
-                    renderPhotos();
-                    showNotification(`✅ OCR completed! Found ${cleanedText.length} text items.`);
-                }, 500);
-                
-            } catch (error) {
-                console.error('OCR error:', error);
-                photoData.status = 'error';
-                showProcessing(false);
-                renderPhotos();
-                showNotification('❌ OCR extraction failed', 'error');
-            }
-        }
-
-        async function simulateOCRExtraction(filename) {
-            const baseTexts = [
-                'Gmail Login', 'john.doe@gmail.com', 'MySecurePassword123',
-                'Facebook', 'user@facebook.com', 'facebookPass456',
-                'Instagram', 'insta_user', 'InstaSecure789',
-                'LinkedIn', 'professional@linkedin.com', 'LinkedPass2023',
-                'Twitter', 'tweet_master', 'TwitterSafe2023',
-                'GitHub', 'developer@github.com', 'GitSecure456',
-                'Microsoft Account', 'ms.user@outlook.com', 'MSPassword789'
-            ];
-
-            const uiTexts = [
-                'Sign In', 'Login', 'Password', 'Username', 'Email', 'Remember Me',
-                'Forgot Password?', 'Create Account', 'Submit', 'Cancel', 'Welcome Back'
-            ];
-
-            return [...baseTexts, ...uiTexts];
-        }
-
-        function cleanAndFilterText(textArray) {
-            const uiWords = ['sign in', 'login', 'password', 'username', 'email', 'remember me', 
-                           'forgot password', 'create account', 'submit', 'cancel', 'welcome back', 
-                           'sign up', 'register', 'continue'];
-            
-            return textArray
-                .filter(text => text && text.trim().length > 2)
-                .filter(text => !uiWords.includes(text.trim().toLowerCase()))
-                .map(text => text.trim())
-                .filter((text, index, array) => array.indexOf(text) === index)
-                .slice(0, 12);
-        }
-
-        function showProcessing(show) {
-            const indicator = document.getElementById('processingIndicator');
-            const uploadArea = document.getElementById('uploadArea');
-            const progressContainer = document.getElementById('progressContainer');
-            
-            if (show) {
-                indicator.classList.add('show');
-                uploadArea.classList.add('processing');
-                progressContainer.style.display = 'block';
-            } else {
-                indicator.classList.remove('show');
-                uploadArea.classList.remove('processing');
-                progressContainer.style.display = 'none';
-            }
-        }
-
-        function updateProgress(percent, text = '') {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            
-            progressFill.style.width = percent + '%';
-            if (text) progressText.textContent = text;
-        }
-
-        function renderPhotos() {
-            const photoGrid = document.getElementById('photoGrid');
-            photoGrid.innerHTML = '';
-            
-            photos.forEach(photo => {
-                const photoItem = document.createElement('div');
-                photoItem.className = 'photo-item bounce-in';
-                
-                let statusText = '📝 Ready to map';
-                let statusClass = 'ready';
-                let buttonText = 'Map';
-                let buttonDisabled = false;
-                let showStatus = false;
-                
-                if (photo.status === 'processing') {
-                    statusText = '⏳ Processing...';
-                    statusClass = 'processing';
-                    buttonText = 'Wait';
-                    buttonDisabled = true;
-                    showStatus = true;
-                } else if (photo.status === 'error') {
-                    statusText = '❌ OCR Failed';
-                    statusClass = 'error';
-                    buttonText = 'Retry';
-                    showStatus = true;
-                } else if (photo.extractedText && photo.extractedText.length === 0) {
-                    statusText = '⚠️ No text found';
-                    statusClass = 'error';
-                    showStatus = true;
-                }
-                
-                photoItem.innerHTML = `
-                    <img src="${photo.data}" alt="${photo.name}" onclick="openPhotoModal('${photo.id}')">
-                    ${showStatus ? `<div class="extract-status ${statusClass}">${statusText}</div>` : ''}
-                    <div class="photo-overlay">
-                        <div class="photo-actions">
-                            <button class="map-btn" onclick="openMappingModal('${photo.id}')" ${buttonDisabled ? 'disabled' : ''}>${buttonText}</button>
-                            <button class="delete-btn" onclick="confirmDeletePhoto('${photo.id}')">Delete</button>
-                        </div>
-                    </div>
-                `;
-                photoGrid.appendChild(photoItem);
-            });
-            updateEmptyStates();
-        }
-
-        // Photo modal functions
-        function openPhotoModal(photoId) {
-            const photo = photos.find(p => p.id == photoId);
-            if (photo) {
-                document.getElementById('photoModalImage').src = photo.data;
-                document.getElementById('photoModal').classList.add('active');
-            }
-        }
-
-        function closePhotoModal() {
-            document.getElementById('photoModal').classList.remove('active');
-        }
-
-        function openMappingModal(photoId) {
-            currentPhoto = photos.find(p => p.id == photoId);
-            if (!currentPhoto || currentPhoto.status !== 'ready') {
-                showNotification('❌ Photo is not ready for mapping yet!', 'error');
-                return;
-            }
-
-            extractedTextItems = currentPhoto.extractedText ? [...currentPhoto.extractedText] : [];
-            resetSelectionState();
-            
-            document.getElementById('mappingModal').classList.add('active');
-            document.getElementById('modalTitle').textContent = `🎯 Map Credentials from "${currentPhoto.name}"`;
-            
-            populateTextList();
-        }
-
-        function resetSelectionState() {
-            selections = { entity: '', username: '', password: '' };
-            
-            document.getElementById('selectedEntity').textContent = 'Drop text here';
-            document.getElementById('selectedUsername').textContent = 'Drop text here';
-            document.getElementById('selectedPassword').textContent = 'Drop text here';
-            
-            document.querySelectorAll('.selection-controls').forEach(control => {
-                control.style.display = 'none';
-            });
-            
-            document.querySelectorAll('.selection-value').forEach(val => {
-                val.classList.remove('filled');
-            });
-            
-            document.getElementById('saveBtn').disabled = true;
-        }
-
-        function populateTextList() {
-            const textList = document.getElementById('textList');
-            textList.innerHTML = '';
-            
-            if (extractedTextItems.length === 0) {
-                textList.innerHTML = '<div class="text-item" style="text-align: center; color: #9ca3af; cursor: default;">No text available - try adding manually</div>';
-                return;
-            }
-            
-            extractedTextItems.forEach((text, index) => {
-                const item = document.createElement('div');
-                item.className = 'text-item';
-                item.innerHTML = `
-                    ${text}
-                    <span class="text-item-index">${index + 1}</span>
-                `;
-                item.draggable = true;
-                item.dataset.index = index;
-                item.dataset.text = text;
-                item.dataset.originalIndex = currentPhoto.originalOrder.indexOf(text);
-                
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragend', handleDragEnd);
-                
-                item.onclick = (e) => {
-                    if (!e.target.classList.contains('text-item-index')) {
-                        selectTextByClick(text, index);
-                    }
-                };
-                
-                textList.appendChild(item);
-            });
-            
-            setupDropZones();
-        }
-
-        function setupDropZones() {
-            const dropZones = document.querySelectorAll('.selection-display');
-            dropZones.forEach(zone => {
-                zone.addEventListener('dragover', handleDragOver);
-                zone.addEventListener('drop', handleDrop);
-                zone.addEventListener('dragenter', handleDragEnter);
-                zone.addEventListener('dragleave', handleDragLeave);
-            });
-        }
-
-        function handleDragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.dataset.text);
-            e.dataTransfer.setData('text/index', e.target.dataset.index);
-            e.dataTransfer.setData('text/originalIndex', e.target.dataset.originalIndex);
-            e.target.classList.add('dragging');
-        }
-
-        function handleDragEnd(e) {
-            e.target.classList.remove('dragging');
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-        }
-
-        function handleDragEnter(e) {
-            e.preventDefault();
-            e.target.closest('.selection
+            70% { transform: scale(0
