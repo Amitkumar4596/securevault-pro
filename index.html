@@ -5,36 +5,55 @@
             passwordRows.innerHTML = '';
             
             // Use filtered passwords if search is active
-            const searchTerm = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
             const passwordsToShow = searchTerm !== '' ? filteredPasswords : passwords;
             
             passwordsToShow.forEach(pwd => {
                 const row = document.createElement('div');
                 row.className = 'table-row bounce-in';
-                row.innerHTML = `
-                    <div class="cell entity">
-                        <span id="entity-${pwd.id}">${pwd.entity}</span>
-                        <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                    </div>
-                    <div class="cell">
-                        <span id="username-${pwd.id}">${pwd.username}</span>
-                        <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                    </div>
-                    <div class="cell password">
-                        <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
-                        <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                        <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
-                    </div>
-                    <div class="cell actions">
-                        <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
-                        <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
-                        <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
-                        <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
-                        <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
-                    </div>
+                
+                // Create the row HTML properly
+                const entityCell = document.createElement('div');
+                entityCell.className = 'cell entity';
+                entityCell.innerHTML = `
+                    <span id="entity-${pwd.id}">${pwd.entity}</span>
+                    <input type="text" id="edit-entity-${pwd.id}" value="${pwd.entity}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
                 `;
+                
+                const usernameCell = document.createElement('div');
+                usernameCell.className = 'cell';
+                usernameCell.innerHTML = `
+                    <span id="username-${pwd.id}">${pwd.username}</span>
+                    <input type="text" id="edit-username-${pwd.id}" value="${pwd.username}" style="display: none; width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                `;
+                
+                const passwordCell = document.createElement('div');
+                passwordCell.className = 'cell password';
+                passwordCell.innerHTML = `
+                    <span class="password-text" id="pwd-${pwd.id}">••••••••</span>
+                    <input type="text" id="edit-password-${pwd.id}" value="${pwd.password}" style="display: none; width: 70%; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button class="toggle-pwd" onclick="togglePassword('${pwd.id}')" title="Show/Hide" id="toggle-${pwd.id}">👁️</button>
+                `;
+                
+                const actionsCell = document.createElement('div');
+                actionsCell.className = 'cell actions';
+                actionsCell.innerHTML = `
+                    <button class="action-btn copy-btn" onclick="copyPassword('${pwd.id}')" title="Copy" id="copy-${pwd.id}">📋</button>
+                    <button class="action-btn edit-btn" onclick="editCredential('${pwd.id}')" title="Edit" id="edit-${pwd.id}">✏️</button>
+                    <button class="action-btn save-edit-btn" onclick="saveEdit('${pwd.id}')" title="Save" id="save-${pwd.id}" style="display: none;">💾</button>
+                    <button class="action-btn cancel-edit-btn" onclick="cancelEdit('${pwd.id}')" title="Cancel" id="cancel-${pwd.id}" style="display: none;">❌</button>
+                    <button class="action-btn delete-password-btn" onclick="confirmDeletePassword('${pwd.id}')" title="Delete">🗑️</button>
+                `;
+                
+                row.appendChild(entityCell);
+                row.appendChild(usernameCell);
+                row.appendChild(passwordCell);
+                row.appendChild(actionsCell);
+                
                 passwordRows.appendChild(row);
             });
+            
             updateEmptyStates();
         }
 
@@ -1316,7 +1335,7 @@
         });
 
         // Initialize app
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', function() {
             // Initialize filtered passwords array
             filteredPasswords = [];
             
@@ -1331,6 +1350,8 @@
             renderPasswords();
             updateEmptyStates();
         });
+
+        // Ensure script closes properly
     </script>
 </body>
 </html>flex';
