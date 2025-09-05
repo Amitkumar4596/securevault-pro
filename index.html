@@ -1292,6 +1292,7 @@
                 <button class="menu-btn" onclick="toggleDropdown()">⋮</button>
                 <div class="dropdown-menu" id="dropdownMenu">
                     <button class="dropdown-item" onclick="changePassword()">🔑 Change Password</button>
+                    <button class="dropdown-item" onclick="clearAllData()">🗑️ Clear OCR Cache</button>
                     <button class="dropdown-item" onclick="logout()">🚪 Logout</button>
                 </div>
                 <h1>🔐 SecureVault Pro</h1>
@@ -1934,9 +1935,28 @@
         }
 
         function cleanAndFilterText(textArray) {
-            // Since we can't actually extract text from images in a browser environment,
-            // just return empty array. Users must add text manually.
-            return [];
+            if (!textArray || textArray.length === 0) {
+                return [];
+            }
+            
+            // Clear cache by creating fresh array
+            const freshArray = [...textArray];
+            
+            // Filter and clean the extracted text from OCR
+            const uiWords = ['sign', 'login', 'password', 'username', 'email', 'remember', 
+                           'forgot', 'create', 'account', 'submit', 'cancel', 'welcome', 
+                           'back', 'register', 'continue', 'loading', 'please', 'wait',
+                           'enter', 'your', 'user', 'name', 'pass', 'word'];
+            
+            return freshArray
+                .filter(text => text && typeof text === 'string' && text.trim().length > 1)
+                .map(text => text.trim())
+                .filter(text => text.length >= 3 && text.length <= 50) // Reasonable length
+                .filter(text => !/^[\s\.\-_@#!]+$/.test(text)) // Filter out lines with only symbols
+                .filter(text => !uiWords.some(uiWord => text.toLowerCase().includes(uiWord))) // Filter UI words
+                .filter(text => !/^[0-9\s\.\-]+$/.test(text)) // Filter pure numbers/dates
+                .filter((text, index, array) => array.indexOf(text) === index) // Remove duplicates
+                .slice(0, 12); // Limit to 12 items
         }
 
         function showProcessing(show) {
