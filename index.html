@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,6 +15,9 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/4f46e5/ffffff?text=🔐">
     <link rel="icon" type="image/x-icon" href="https://via.placeholder.com/32x32/4f46e5/ffffff?text=🔐">
+    
+    <!-- Tesseract.js for real OCR -->
+    <script src="https://unpkg.com/tesseract.js@v5.1.1/dist/tesseract.min.js"></script>
     
     <title>SecureVault Pro - AI Credential Manager</title>
     <style>
@@ -1525,7 +1527,7 @@
         let filteredPasswords = [];
         let currentPhoto = null;
         let extractedTextItems = [];
-        let selections = { entity: '', username: '', password: '' };
+        let selections = { entity: '', username: '', password: '', entity_originalIndex: -1, username_originalIndex: -1, password_originalIndex: -1 };
         let pendingAction = null;
         let isAuthenticated = false;
         let masterPasswordHash = null;
@@ -1817,6 +1819,18 @@
             }
         }
 
+        function clearAllData() {
+            const confirmed = confirm('🗑️ Are you sure you want to clear all photos and credentials? This cannot be undone.');
+            if (confirmed) {
+                photos = [];
+                passwords = [];
+                renderPhotos();
+                renderPasswords();
+                showNotification('🗑️ All data cleared successfully');
+            }
+            document.getElementById('dropdownMenu').classList.remove('active');
+        }
+
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById('dropdownMenu');
@@ -1883,23 +1897,41 @@
         async function extractTextWithOCR(photoData) {
             try {
                 showProcessing(true);
-                updateProgress(10, 'Initializing OCR engine...');
+                updateProgress(0, 'Initializing OCR engine...');
 
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                updateProgress(40, 'Analyzing image content...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                updateProgress(70, 'Extracting text patterns...');
-                await new Promise(resolve => setTimeout(resolve, 800));
-                updateProgress(90, 'Processing results...');
+                const result = await Tesseract.recognize(
+                    photoData.data,
+                    'eng',  // English; change to other languages if needed (e.g., 'eng+fra')
+                    {
+                        logger: (m) => {
+                            console.log(m);
+                            if (m.status === 'recognizing text') {
+                                updateProgress(Math.round(m.progress * 100), 'Extracting text...');
+                            } else if (m.status === 'loading tesseract core') {
+                                updateProgress(10, 'Loading OCR core...');
+                            } else if (m.status === 'initializing tesseract') {
+                                updateProgress(30, 'Initializing OCR...');
+                            } else if (m.status === 'loading language traineddata') {
+                                updateProgress(50, 'Loading language data...');
+                            } else if (m.status === 'loaded language traineddata') {
+                                updateProgress(70, 'Language data loaded...');
+                            } else if (m.status === 'initializing api') {
+                                updateProgress(80, 'Initializing API...');
+                            } else if (m.status === 'initialized api') {
+                                updateProgress(90, 'API ready...');
+                            }
+                        }
+                    }
+                );
 
-                const sampleText = await simulateOCRExtraction(photoData.name);
-                const cleanedText = cleanAndFilterText(sampleText);
+                updateProgress(100, 'OCR completed successfully!');
+
+                const textLines = result.data.text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                const cleanedText = cleanAndFilterText(textLines);
                 
                 photoData.extractedText = [...cleanedText];
                 photoData.originalOrder = [...cleanedText];
                 photoData.status = 'ready';
-                
-                updateProgress(100, 'OCR completed successfully!');
                 
                 setTimeout(() => {
                     showProcessing(false);
@@ -1912,27 +1944,8 @@
                 photoData.status = 'error';
                 showProcessing(false);
                 renderPhotos();
-                showNotification('❌ OCR extraction failed', 'error');
+                showNotification('❌ OCR extraction failed. Try again or check console for details.', 'error');
             }
-        }
-
-        async function simulateOCRExtraction(filename) {
-            const baseTexts = [
-                'Gmail Login', 'john.doe@gmail.com', 'MySecurePassword123',
-                'Facebook', 'user@facebook.com', 'facebookPass456',
-                'Instagram', 'insta_user', 'InstaSecure789',
-                'LinkedIn', 'professional@linkedin.com', 'LinkedPass2023',
-                'Twitter', 'tweet_master', 'TwitterSafe2023',
-                'GitHub', 'developer@github.com', 'GitSecure456',
-                'Microsoft Account', 'ms.user@outlook.com', 'MSPassword789'
-            ];
-
-            const uiTexts = [
-                'Sign In', 'Login', 'Password', 'Username', 'Email', 'Remember Me',
-                'Forgot Password?', 'Create Account', 'Submit', 'Cancel', 'Welcome Back'
-            ];
-
-            return [...baseTexts, ...uiTexts];
         }
 
         function cleanAndFilterText(textArray) {
@@ -2060,7 +2073,7 @@
         }
 
         function resetSelectionState() {
-            selections = { entity: '', username: '', password: '' };
+            selections = { entity: '', username: '', password: '', entity_originalIndex: -1, username_originalIndex: -1, password_originalIndex: -1 };
             
             document.getElementById('selectedEntity').textContent = 'Drop text here';
             document.getElementById('selectedUsername').textContent = 'Drop text here';
@@ -2361,7 +2374,7 @@
             updateEmptyStates();
         }
 
-        // Search functionality - Define globally to ensure accessibility
+        // Search functionality
         window.searchCredentials = function() {
             const searchInput = document.getElementById('searchInput');
             const clearBtn = document.getElementById('clearSearch');
@@ -2400,13 +2413,13 @@
 
         function togglePassword(passwordId) {
             const passwordDisplay = document.getElementById(`pwd-${passwordId}`);
-            const password = passwords.find(p => p.id == passwordId);
-            passwordDisplay.textContent = passwordDisplay.textContent === '••••••••' ? password.password : '••••••••';
+            const password = passwords.find(p => p.id == passwordId).password;
+            passwordDisplay.textContent = passwordDisplay.textContent === '••••••••' ? password : '••••••••';
         }
 
         function copyPassword(passwordId) {
-            const password = passwords.find(p => p.id == passwordId);
-            navigator.clipboard.writeText(password.password).then(() => {
+            const password = passwords.find(p => p.id == passwordId).password;
+            navigator.clipboard.writeText(password).then(() => {
                 showNotification('📋 Password copied to clipboard!');
             });
         }
@@ -2428,7 +2441,7 @@
         }
 
         function saveEdit(passwordId) {
-            const password = passwords.find(p => p.id == passwordId);
+            const pwd = passwords.find(p => p.id == passwordId);
             
             const newEntity = document.getElementById(`edit-entity-${passwordId}`).value.trim();
             const newUsername = document.getElementById(`edit-username-${passwordId}`).value.trim();
@@ -2439,9 +2452,9 @@
                 return;
             }
             
-            password.entity = newEntity;
-            password.username = newUsername;
-            password.password = newPassword;
+            pwd.entity = newEntity;
+            pwd.username = newUsername;
+            pwd.password = newPassword;
             
             renderPasswords();
             showNotification('✅ Credential updated successfully!');
@@ -2463,11 +2476,11 @@
         }
 
         function confirmDeletePassword(passwordId) {
-            const password = passwords.find(p => p.id == passwordId);
+            const pwd = passwords.find(p => p.id == passwordId);
             showConfirmModal(
                 '🗑️',
                 'Delete Credential?',
-                `This will permanently delete the credential for "${password.entity}". This action cannot be undone.`,
+                `This will permanently delete the credential for "${pwd.entity}". This action cannot be undone.`,
                 'Delete Credential',
                 () => deletePassword(passwordId)
             );
@@ -2498,16 +2511,16 @@
 
         function deletePhoto(photoId) {
             const photo = photos.find(p => p.id == photoId);
-            photos = photos.filter(photo => photo.id != photoId);
+            photos = photos.filter(p => p.id != photoId);
             renderPhotos();
             showNotification(`🗑️ Photo "${photo.name}" deleted successfully`);
         }
 
         function deletePassword(passwordId) {
-            const password = passwords.find(p => p.id == passwordId);
+            const pwd = passwords.find(p => p.id == passwordId);
             passwords = passwords.filter(p => p.id != passwordId);
             renderPasswords();
-            showNotification(`🗑️ Credential "${password.entity}" deleted successfully`);
+            showNotification(`🗑️ Credential "${pwd.entity}" deleted successfully`);
         }
 
         function updateEmptyStates() {
@@ -2593,4 +2606,3 @@
     </script>
 </body>
 </html>
-```
